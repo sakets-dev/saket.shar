@@ -13,7 +13,7 @@ function CursorTrail() {
     window.addEventListener("resize", resize);
     const onMove = (e) => {
       for (let i = 0; i < 3; i++)
-        dots.current.push({ x: e.clientX+(Math.random()-.5)*10, y: e.clientY+(Math.random()-.5)*10, r: Math.random()*2.2+.5, alpha:.55, vx:(Math.random()-.5)*.5, vy:(Math.random()-.5)*.5-.3 });
+        dots.current.push({ x: e.clientX+(Math.random()-.5)*10, y: e.clientY+(Math.random()-.5)*10, r: Math.random()*2.2+.5, alpha:.5, vx:(Math.random()-.5)*.5, vy:(Math.random()-.5)*.5-.3 });
     };
     window.addEventListener("mousemove", onMove);
     const draw = () => {
@@ -29,76 +29,107 @@ function CursorTrail() {
 }
 
 /* ─── 3D GLOBE ─── */
-function ParticleGlobe() {
+function ParticleGlobe({ size = 520 }) {
   const canvasRef = useRef(null);
-  const s = useRef({ rotX:0.35, rotY:0, velX:0, velY:0.003, dragging:false, lastX:0, lastY:0 });
+  const s = useRef({ rotX:0.3, rotY:0, velX:0, velY:0.006, dragging:false, lastX:0, lastY:0 });
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    const W=380, H=380, R=135;
+    const pad=44, W=size+pad*2, H=size+pad*2, R=size*0.46;
     canvas.width=W; canvas.height=H;
     const pts=[], golden=Math.PI*(3-Math.sqrt(5));
-    for(let i=0;i<300;i++){const y=1-(i/299)*2,r=Math.sqrt(1-y*y),th=golden*i;pts.push({ox:Math.cos(th)*r,oy:y,oz:Math.sin(th)*r});}
-    for(let i=0;i<50;i++){const u=Math.random(),v=Math.random(),th=2*Math.PI*u,ph=Math.acos(2*v-1);pts.push({ox:Math.sin(ph)*Math.cos(th),oy:Math.cos(ph),oz:Math.sin(ph)*Math.sin(th)});}
+    for(let i=0;i<340;i++){const y=1-(i/339)*2,r=Math.sqrt(1-y*y),th=golden*i;pts.push({ox:Math.cos(th)*r,oy:y,oz:Math.sin(th)*r});}
+    for(let i=0;i<60;i++){const u=Math.random(),v=Math.random(),th=2*Math.PI*u,ph=Math.acos(2*v-1);pts.push({ox:Math.sin(ph)*Math.cos(th),oy:Math.cos(ph),oz:Math.sin(ph)*Math.sin(th)});}
     let raf;
     const draw=()=>{
       ctx.clearRect(0,0,W,H);
       const cx=W/2,cy=H/2,st=s.current;
-      if(!st.dragging){st.rotY+=st.velY;st.velX*=.96;st.rotX+=st.velX;}
+      if(!st.dragging){
+        // gradually ease velY back toward base speed 0.006, velX back to 0
+        st.velY += (0.006 - st.velY) * 0.012;
+        st.velX *= 0.97;
+        st.rotY += st.velY;
+        st.rotX += st.velX;
+      }
       const cX=Math.cos(st.rotX),sX=Math.sin(st.rotX),cY=Math.cos(st.rotY),sY=Math.sin(st.rotY);
       const proj=pts.map(p=>{
         const x=p.ox*cY-p.oz*sY,z=p.ox*sY+p.oz*cY,y=p.oy;
         const y2=y*cX-z*sX,z2=y*sX+z*cX,sc=(z2+2.4)/3.4;
         return{sx:cx+x*R*sc,sy:cy+y2*R*sc,z:z2,sc};
       }).sort((a,b)=>a.z-b.z);
+      const palette=[[99,102,241],[139,92,246],[56,189,248],[52,211,153],[251,113,133],[251,191,36],[34,211,238]];
       const front=proj.filter(p=>p.z>0);
       for(let i=0;i<front.length;i++)for(let j=i+1;j<front.length;j++){
         const dx=front[i].sx-front[j].sx,dy=front[i].sy-front[j].sy,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<40){ctx.beginPath();ctx.moveTo(front[i].sx,front[i].sy);ctx.lineTo(front[j].sx,front[j].sy);ctx.strokeStyle=`rgba(160,180,255,${(1-d/40)*.15*Math.min(front[i].sc,front[j].sc)})`;ctx.lineWidth=.55;ctx.stroke();}
+        if(d<46){
+          const colorIdx=Math.floor(((front[i].z+1)/2*3+front[i].sx/W*4))%palette.length;
+          const [r,g,b]=palette[colorIdx];
+          const alpha=(1-d/46)*.38*Math.min(front[i].sc,front[j].sc);
+          ctx.beginPath();ctx.moveTo(front[i].sx,front[i].sy);ctx.lineTo(front[j].sx,front[j].sy);
+          ctx.strokeStyle=`rgba(${r},${g},${b},${alpha})`;ctx.lineWidth=.8;ctx.stroke();
+        }
       }
       for(const p of proj){
         const t=(p.z+1)/2;
-        ctx.beginPath();ctx.arc(p.sx,p.sy,Math.max(p.sc*.84,.4),0,Math.PI*2);
-        ctx.fillStyle=`rgba(${Math.round(120+t*40)},${Math.round(150+t*30)},255,${((p.z+1)/2*.8+.08)*p.sc})`;ctx.fill();
+        const ci=Math.floor((p.sx/W*4+p.sy/H*3))%palette.length;
+        const [r,g,b]=palette[ci];
+        ctx.beginPath();ctx.arc(p.sx,p.sy,Math.max(p.sc*1.1,.4),0,Math.PI*2);
+        ctx.fillStyle=`rgba(${r},${g},${b},${(t*.85+.12)*p.sc})`;ctx.fill();
       }
-      const grd=ctx.createRadialGradient(cx,cy,R*.8,cx,cy,R*1.2);
-      grd.addColorStop(0,"rgba(100,120,255,0)");grd.addColorStop(.5,"rgba(100,120,255,.055)");grd.addColorStop(1,"rgba(100,120,255,0)");
-      ctx.beginPath();ctx.arc(cx,cy,R*1.15,0,Math.PI*2);ctx.fillStyle=grd;ctx.fill();
+      // Glow based on actual point positions — accumulate color per screen region
+      // Only use edge points (close to globe surface) for glow
+      const edgePts = proj.filter(p => {
+        const dx=p.sx-cx, dy=p.sy-cy, dist=Math.sqrt(dx*dx+dy*dy);
+        return dist > R*0.7; // only outer ring of points
+      });
+      for(const p of edgePts){
+        const ci=Math.floor((p.sx/W*4+p.sy/H*3))%palette.length;
+        const [gr,gg,gb]=palette[ci];
+        const brightness = (p.z+1)/2; // front-facing points glow more
+        const spot=ctx.createRadialGradient(p.sx,p.sy,0,p.sx,p.sy,R*0.22);
+        spot.addColorStop(0,`rgba(${gr},${gg},${gb},${0.018*brightness})`);
+        spot.addColorStop(0.35,`rgba(${gr},${gg},${gb},${0.006*brightness})`);
+        spot.addColorStop(0.7,`rgba(${gr},${gg},${gb},${0.002*brightness})`);
+        spot.addColorStop(1,`rgba(${gr},${gg},${gb},0)`);
+        ctx.beginPath();ctx.arc(p.sx,p.sy,R*0.22,0,Math.PI*2);
+        ctx.fillStyle=spot;ctx.fill();
+      }
       raf=requestAnimationFrame(draw);
     };
     draw();
     const st=s.current;
     const dn=(e)=>{st.dragging=true;st.lastX=e.clientX??e.touches?.[0]?.clientX;st.lastY=e.clientY??e.touches?.[0]?.clientY;};
-    const mv=(e)=>{if(!st.dragging)return;const x=e.clientX??e.touches?.[0]?.clientX,y=e.clientY??e.touches?.[0]?.clientY;st.velY=(x-st.lastX)*.011;st.velX=(y-st.lastY)*.011;st.rotY+=st.velY;st.rotX+=st.velX;st.lastX=x;st.lastY=y;};
+    const mv=(e)=>{if(!st.dragging)return;const x=e.clientX??e.touches?.[0]?.clientX,y=e.clientY??e.touches?.[0]?.clientY;st.velY=(x-st.lastX)*.01;st.velX=(y-st.lastY)*.01;st.rotY+=st.velY;st.rotX+=st.velX;st.lastX=x;st.lastY=y;};
     const up=()=>{st.dragging=false;};
     canvas.addEventListener("mousedown",dn);canvas.addEventListener("touchstart",dn,{passive:true});
     window.addEventListener("mousemove",mv);window.addEventListener("touchmove",mv,{passive:true});
     window.addEventListener("mouseup",up);window.addEventListener("touchend",up);
     return()=>{cancelAnimationFrame(raf);canvas.removeEventListener("mousedown",dn);canvas.removeEventListener("touchstart",dn);window.removeEventListener("mousemove",mv);window.removeEventListener("touchmove",mv);window.removeEventListener("mouseup",up);window.removeEventListener("touchend",up);};
   },[]);
-  return(
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",userSelect:"none",flexShrink:0}}>
-      <canvas ref={canvasRef} style={{cursor:"grab",display:"block"}}/>
-      <span style={{fontSize:9,color:"rgba(255,255,255,0.16)",letterSpacing:"0.12em",marginTop:6,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>DRAG TO ROTATE</span>
-    </div>
-  );
+  return <canvas ref={canvasRef} style={{cursor:"grab",display:"block"}}/>;
 }
 
-/* ─── REVEAL ─── */
-function Reveal({children,delay=0,style={},tag="div"}){
+/* ─── REVEAL (intersection observer) ─── */
+function Reveal({children,delay=0,style={},tag="div",from="bottom"}){
+  const ref=useRef(null);
   const[v,setV]=useState(false);
-  useEffect(()=>{const t=setTimeout(()=>setV(true),delay);return()=>clearTimeout(t);},[delay]);
+  useEffect(()=>{
+    const el=ref.current;
+    if(!el)return;
+    const obs=new IntersectionObserver(([e])=>{if(e.isIntersecting){setTimeout(()=>setV(true),delay);obs.disconnect();}},{threshold:0.1});
+    obs.observe(el);
+    return()=>obs.disconnect();
+  },[delay]);
   const Tag=tag;
-  return<Tag style={{opacity:v?1:0,transform:v?"translateY(0)":"translateY(16px)",transition:`opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1)`,transitionDelay:`${delay}ms`,...style}}>{children}</Tag>;
+  const init=from==="left"?"translateX(-24px)":from==="right"?"translateX(24px)":"translateY(20px)";
+  return<Tag ref={ref} style={{opacity:v?1:0,transform:v?"translate(0)":init,transition:`opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1)`,transitionDelay:`${delay}ms`,...style}}>{children}</Tag>;
 }
 
 /* ─── GRID BG ─── */
 function GridBg(){
   return(
     <div style={{position:"fixed",inset:0,zIndex:0,pointerEvents:"none"}}>
-      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)",backgroundSize:"42px 42px",maskImage:"radial-gradient(ellipse 85% 75% at 50% 35%, black 20%, transparent 100%)",WebkitMaskImage:"radial-gradient(ellipse 85% 75% at 50% 35%, black 20%, transparent 100%)"}}/>
-      <div style={{position:"absolute",top:"-15%",left:"-5%",width:"45%",height:"55%",borderRadius:"50%",background:"radial-gradient(ellipse,rgba(99,102,241,.07) 0%,transparent 70%)",animation:"blobA 20s ease-in-out infinite alternate"}}/>
-      <div style={{position:"absolute",bottom:"5%",right:"-5%",width:"40%",height:"50%",borderRadius:"50%",background:"radial-gradient(ellipse,rgba(59,130,246,.05) 0%,transparent 70%)",animation:"blobB 25s ease-in-out infinite alternate"}}/>
+      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",backgroundSize:"44px 44px",maskImage:"radial-gradient(ellipse 90% 80% at 50% 40%, black 20%, transparent 100%)",WebkitMaskImage:"radial-gradient(ellipse 90% 80% at 50% 40%, black 20%, transparent 100%)"}}/>
     </div>
   );
 }
@@ -106,31 +137,73 @@ function GridBg(){
 /* ─── PROJECT ROW ─── */
 function ProjectRow({p,delay}){
   const[open,setOpen]=useState(false);
+  const[hovered,setHovered]=useState(false);
   return(
     <Reveal delay={delay}>
-      <div onClick={()=>setOpen(o=>!o)} style={{borderBottom:"1px solid rgba(255,255,255,0.07)",background:open?"rgba(255,255,255,0.025)":"transparent",borderRadius:open?10:0,overflow:"hidden",transition:"background .25s",cursor:"pointer"}}>
-        <div style={{display:"flex",alignItems:"center",padding:"15px 12px",transition:"padding-left .3s cubic-bezier(.16,1,.3,1)"}}
-          onMouseEnter={e=>e.currentTarget.style.paddingLeft="22px"}
-          onMouseLeave={e=>e.currentTarget.style.paddingLeft="12px"}
+      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",overflow:"hidden"}}>
+        {/* Header row */}
+        <div
+          onClick={()=>setOpen(o=>!o)}
+          onMouseEnter={()=>setHovered(true)}
+          onMouseLeave={()=>setHovered(false)}
+          style={{
+            display:"flex",alignItems:"center",
+            padding:"20px 16px",
+            cursor:"pointer",
+            background:hovered?"rgba(255,255,255,.02)":"transparent",
+            transform:hovered?"translateX(8px)":"translateX(0)",
+            transition:"transform .4s cubic-bezier(.16,1,.3,1),background .25s",
+          }}
         >
-          <span style={{width:7,height:7,borderRadius:"50%",background:p.accent,display:"inline-block",marginRight:16,flexShrink:0,boxShadow:`0 0 8px ${p.accent}99`}}/>
-          <span style={{fontFamily:"'Instrument Serif',serif",fontSize:21,fontWeight:400,color:"#ede9e2",letterSpacing:"-0.02em",flex:1}}>{p.title}</span>
-          {p.winner&&<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 9px",borderRadius:999,fontSize:9.5,fontWeight:700,letterSpacing:".08em",background:"linear-gradient(90deg,rgba(251,191,36,.18),rgba(245,158,11,.12))",border:"1px solid rgba(251,191,36,.32)",color:"#fbbf24",marginRight:12,whiteSpace:"nowrap"}}>🏆 WINNER</span>}
+          <span style={{width:6,height:6,borderRadius:"50%",background:p.accent,display:"inline-block",marginRight:20,flexShrink:0,boxShadow:`0 0 8px ${p.accent}aa`,transition:"transform .3s",transform:hovered?"scale(1.5)":"scale(1)"}}/>
+          <span style={{fontFamily:"'Instrument Serif',serif",fontSize:23,fontWeight:400,color:hovered?"#ede9e2":"rgba(237,233,226,.82)",letterSpacing:"-.025em",flex:1,transition:"color .25s"}}>{p.title}</span>
+          {p.winner&&<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 9px",borderRadius:999,fontSize:9.5,fontWeight:700,letterSpacing:".08em",background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.28)",color:"#fbbf24",marginRight:12,whiteSpace:"nowrap"}}>🏆 WINNER</span>}
           <span style={{fontSize:10.5,fontWeight:500,padding:"2px 9px",borderRadius:999,background:p.tagBg,border:`1px solid ${p.tagBorder}`,color:p.accent,marginRight:14,letterSpacing:".04em"}}>{p.tag}</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,.22)",marginRight:12,fontWeight:300}}>{p.year}</span>
-          <span style={{fontSize:16,color:"rgba(255,255,255,.3)",transition:"transform .3s",transform:open?"rotate(45deg)":"rotate(0deg)",display:"inline-block",lineHeight:1}}>+</span>
+          <span style={{fontSize:11,color:"rgba(255,255,255,.2)",marginRight:14,fontWeight:300}}>{p.year}</span>
+          {/* Animated chevron */}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" style={{transition:"transform .4s cubic-bezier(.16,1,.3,1)",transform:open?"rotate(180deg)":"rotate(0deg)",flexShrink:0}}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </div>
-        <div style={{maxHeight:open?280:0,overflow:"hidden",transition:"max-height .45s cubic-bezier(.16,1,.3,1)"}}>
-          <div style={{padding:"0 12px 18px 39px",display:"grid",gridTemplateColumns:"1fr auto",gap:18,alignItems:"start"}}>
-            <div>
-              <p style={{fontSize:13,lineHeight:1.8,color:"rgba(255,255,255,.42)",fontWeight:300,marginBottom:11}}>{p.about}</p>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {p.tech.split(",").map((t,i)=><span key={i} style={{padding:"2px 9px",borderRadius:999,fontSize:10.5,fontWeight:500,background:p.tagBg,border:`1px solid ${p.tagBorder}`,color:p.accent}}>{t.trim()}</span>)}
+
+        {/* Expandable content — animates in with stagger */}
+        <div style={{
+          display:"grid",
+          gridTemplateRows:open?"1fr":"0fr",
+          transition:"grid-template-rows .5s cubic-bezier(.16,1,.3,1)",
+        }}>
+          <div style={{overflow:"hidden"}}>
+            <div style={{
+              padding:"0 16px 24px 42px",
+              display:"grid",gridTemplateColumns:"1fr auto",gap:24,alignItems:"start",
+              opacity:open?1:0,transform:open?"translateY(0)":"translateY(-8px)",
+              transition:`opacity .4s ease ${open?.08:0}s, transform .4s cubic-bezier(.16,1,.3,1) ${open?.08:0}s`,
+            }}>
+              <div>
+                <p style={{fontSize:13.5,lineHeight:1.85,color:"rgba(255,255,255,.5)",fontWeight:300,marginBottom:14}}>{p.about}</p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {p.tech.split(",").map((t,i)=>(
+                    <span key={i} style={{
+                      padding:"3px 10px",borderRadius:999,fontSize:10.5,fontWeight:500,
+                      background:p.tagBg,border:`1px solid ${p.tagBorder}`,color:p.accent,
+                      opacity:open?1:0,transform:open?"translateY(0)":"translateY(4px)",
+                      transition:`opacity .3s ease ${open?(.12+i*.03):.0}s, transform .3s ease ${open?(.12+i*.03):.0}s`,
+                    }}>{t.trim()}</span>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-              <a href={p.link} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 14px",borderRadius:9,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"rgba(255,255,255,.68)",fontSize:12,fontWeight:500,textDecoration:"none",whiteSpace:"nowrap",transition:"background .2s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.1)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.06)"}>GitHub ↗</a>
-              {p.devpost&&<a href={p.devpost} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 14px",borderRadius:9,background:"rgba(236,72,153,.1)",border:"1px solid rgba(236,72,153,.25)",color:"#f472b6",fontSize:12,fontWeight:500,textDecoration:"none",whiteSpace:"nowrap",transition:"background .2s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(236,72,153,.18)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(236,72,153,.1)"}>Devpost ↗</a>}
+              <div style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0,marginTop:2}}>
+                <a href={p.link} target="_blank" rel="noopener noreferrer"
+                  style={{display:"inline-flex",alignItems:"center",gap:5,padding:"8px 14px",borderRadius:9,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",color:"rgba(255,255,255,.65)",fontSize:12,fontWeight:500,textDecoration:"none",whiteSpace:"nowrap",transition:"background .2s,color .2s",opacity:open?1:0,transform:open?"translateX(0)":"translateX(8px)",transition2:`opacity .35s ease ${open?.18:0}s`}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,.1)";e.currentTarget.style.color="#fff";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,.05)";e.currentTarget.style.color="rgba(255,255,255,.65)";}}
+                >GitHub ↗</a>
+                {p.devpost&&<a href={p.devpost} target="_blank" rel="noopener noreferrer"
+                  style={{display:"inline-flex",alignItems:"center",gap:5,padding:"8px 14px",borderRadius:9,background:"rgba(236,72,153,.08)",border:"1px solid rgba(236,72,153,.22)",color:"#f472b6",fontSize:12,fontWeight:500,textDecoration:"none",whiteSpace:"nowrap",transition:"background .2s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="rgba(236,72,153,.16)"}
+                  onMouseLeave={e=>e.currentTarget.style.background="rgba(236,72,153,.08)"}
+                >Devpost ↗</a>}
+              </div>
             </div>
           </div>
         </div>
@@ -143,18 +216,19 @@ function ProjectRow({p,delay}){
 function TLink({href,icon,label,tooltip,color}){
   const[show,setShow]=useState(false);
   return(
-    <a href={href} target="_blank" rel="noopener noreferrer" onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}
-      style={{position:"relative",display:"inline-flex",alignItems:"center",gap:7,padding:"9px 17px",borderRadius:10,fontSize:13,fontWeight:500,textDecoration:"none",color,background:`${color}15`,border:`1px solid ${color}28`,transition:"transform .2s,box-shadow .2s"}}
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}
+      style={{position:"relative",display:"inline-flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:10,fontSize:13,fontWeight:500,textDecoration:"none",color,background:`${color}12`,border:`1px solid ${color}25`,transition:"transform .2s,background .2s"}}
     >
       {icon}{label}
-      {show&&<span style={{position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",background:"#1c1c26",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,padding:"5px 10px",fontSize:11,color:"rgba(255,255,255,.6)",whiteSpace:"nowrap",pointerEvents:"none",boxShadow:"0 8px 24px rgba(0,0,0,.4)",animation:"tip .15s ease forwards",zIndex:100}}>{tooltip}</span>}
+      {show&&<span style={{position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",background:"#1a1a24",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,padding:"5px 11px",fontSize:11,color:"rgba(255,255,255,.6)",whiteSpace:"nowrap",pointerEvents:"none",boxShadow:"0 8px 24px rgba(0,0,0,.5)",animation:"tip .15s ease forwards",zIndex:100}}>{tooltip}</span>}
     </a>
   );
 }
 
-/* ─── MAIN ─── */
+/* ─── APP ─── */
 export default function App(){
-  const[pos,setPos]=useState({x:0,y:0});
+  const[pos,setPos]=useState({x:-9999,y:-9999});
   useEffect(()=>{const fn=e=>setPos({x:e.clientX,y:e.clientY});window.addEventListener("mousemove",fn);return()=>window.removeEventListener("mousemove",fn);},[]);
 
   const works=[
@@ -165,7 +239,7 @@ export default function App(){
     {title:"Textify — PDF & Image to Text",tag:"Full-Stack",year:"2024",accent:"#fb7185",tagBg:"rgba(225,29,72,.12)",tagBorder:"rgba(225,29,72,.28)",about:"Full-stack OCR web app that converts PDFs and images into editable text using Tesseract and PDFPlumber.",tech:"Python, Flask, PDFPlumber, pytesseract, HTML, CSS, JavaScript",link:"https://github.com/sakets-dev/textify"},
   ];
 
-  const stack=["Python","React","TypeScript","Next.js","Flask","OpenCV","MediaPipe","Docker","MongoDB","Firebase","Tailwind","Git"];
+  const stack=["React","Next.js","Python","TypeScript","AWS","Snowflake","Databricks","PostgreSQL","Docker","Flask","OpenCV","Git"];
   const ghIcon=<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>;
   const liIcon=<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>;
   const emIcon=<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>;
@@ -176,149 +250,147 @@ export default function App(){
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
         html{scroll-behavior:smooth;}
-        body{background:#111118;color:#ddd8d0;font-family:'DM Sans',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
-        @keyframes blobA{from{transform:translate(0,0)}to{transform:translate(4%,7%) scale(1.08)}}
-        @keyframes blobB{from{transform:translate(0,0)}to{transform:translate(-5%,-4%) scale(1.06)}}
+        body{background:#0f0f16;color:#ddd8d0;font-family:'DM Sans',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
         @keyframes tip{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-        .nl{font-size:13px;color:rgba(255,255,255,.32);text-decoration:none;letter-spacing:.04em;transition:color .2s;}
-        .nl:hover{color:rgba(255,255,255,.78);}
-        .pill{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:500;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:rgba(255,255,255,.42);transition:background .18s,color .18s,transform .18s;}
-        .pill:hover{background:rgba(255,255,255,.09);color:rgba(255,255,255,.75);transform:translateY(-2px);}
-        .sl{font-size:10px;letter-spacing:.15em;color:rgba(255,255,255,.24);font-weight:500;text-transform:uppercase;}
+        @keyframes pulseGreen{0%,100%{box-shadow:0 0 5px #4ade80}50%{box-shadow:0 0 14px #4ade80,0 0 24px rgba(74,222,128,.25)}}
+        .dot-pulse{animation:pulseGreen 2.8s ease-in-out infinite;}
+        .pill{display:inline-flex;align-items:center;padding:5px 13px;border-radius:999px;font-size:11.5px;font-weight:400;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.5);transition:background .2s,color .2s,transform .2s,border-color .2s;}
+        .pill:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85);transform:translateY(-2px);border-color:rgba(255,255,255,.15);}
+        .sl{font-size:10px;letter-spacing:.15em;color:rgba(255,255,255,.2);font-weight:500;text-transform:uppercase;}
         ::-webkit-scrollbar{width:3px;}
-        ::-webkit-scrollbar-track{background:#111118;}
-        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:999px;}
+        ::-webkit-scrollbar-track{background:#0f0f16;}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:999px;}
       `}</style>
 
       <CursorTrail/>
       <GridBg/>
-      {/* mouse glow */}
-      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:1,background:`radial-gradient(650px circle at ${pos.x}px ${pos.y}px,rgba(99,120,255,.05),transparent 55%)`}}/>
+      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:1,background:`radial-gradient(200px circle at ${pos.x}px ${pos.y}px,rgba(120,140,255,.08),transparent 100%)`}}/>
 
       <div style={{position:"relative",zIndex:2}}>
 
-        {/* NAV */}
-        <Reveal delay={0} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 48px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:9}}>
-            <div style={{width:26,height:26,borderRadius:7,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontFamily:"'Instrument Serif'",fontSize:13,color:"#fff"}}>S</span>
+        {/* ── NAV ── */}
+        <Reveal delay={0}>
+          <nav style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 64px"}}>
+            <span style={{fontFamily:"'Instrument Serif',serif",fontSize:15,color:"rgba(255,255,255,.55)",letterSpacing:"-.01em"}}>saket.sharma</span>
+            <div style={{display:"flex",alignItems:"center",gap:2,padding:"5px 6px",borderRadius:999,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)"}}>
+              {[["About","#about"],["Work","#work"]].map(([label,href])=>(
+                <a key={label} href={href} style={{padding:"6px 18px",borderRadius:999,fontSize:12.5,color:"rgba(255,255,255,.42)",textDecoration:"none",letterSpacing:".02em",fontWeight:400,transition:"background .2s,color .2s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,.07)";e.currentTarget.style.color="rgba(255,255,255,.85)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,.42)";}}
+                >{label}</a>
+              ))}
             </div>
-            <span style={{fontFamily:"'Instrument Serif',serif",fontSize:16,color:"rgba(255,255,255,.75)",letterSpacing:"-.01em"}}>saket.sharma</span>
-          </div>
-          <div style={{display:"flex",gap:32}}>{["work","about","contact"].map(n=><a key={n} href={`#${n}`} className="nl">{n}</a>)}</div>
-          <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:999,background:"rgba(74,222,128,.07)",border:"1px solid rgba(74,222,128,.18)"}}>
-            <div style={{width:5,height:5,borderRadius:"50%",background:"#4ade80"}}/>
-            <span style={{fontSize:11,color:"#4ade80",fontWeight:500,letterSpacing:".02em"}}>Available</span>
-          </div>
+            <a href="mailto:saketshar04@gmail.com" style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",borderRadius:999,background:"rgba(74,222,128,.06)",border:"1px solid rgba(74,222,128,.15)",textDecoration:"none",transition:"border-color .2s"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(74,222,128,.4)"}
+              onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(74,222,128,.15)"}
+            >
+              <div className="dot-pulse" style={{width:5,height:5,borderRadius:"50%",background:"#4ade80"}}/>
+              <span style={{fontSize:11,color:"#4ade80",fontWeight:500,letterSpacing:".04em"}}>Available</span>
+            </a>
+          </nav>
         </Reveal>
 
-        {/* HERO — two column, no min-height */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"flex-start",padding:"36px 48px 52px",minHeight:"82vh"}}>
+        {/* ── HERO ── */}
+        <div style={{display:"flex",alignItems:"center",minHeight:"92vh",padding:"0 52px",gap:0}}>
+          <div style={{flex:"0 0 50%",paddingLeft:72,paddingRight:48,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start"}}>
 
-          {/* LEFT: text */}
-          <div style={{flex:"1 1 auto",maxWidth:560}}>
             <Reveal delay={80}>
-              <div style={{display:"flex",gap:8,marginBottom:18}}>
-                {["CS + Statistics","University of Toronto","2026"].map((t,i)=>(
-                  <span key={i} style={{padding:"3px 10px",borderRadius:999,fontSize:10.5,fontWeight:500,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.09)",color:"rgba(255,255,255,.38)",letterSpacing:".03em"}}>{t}</span>
+              <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
+                {["CS + Statistics","University of Toronto","Class of 2026"].map((t,i)=>(
+                  <span key={i} style={{padding:"4px 13px",borderRadius:999,fontSize:11,fontWeight:500,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",color:"rgba(255,255,255,.4)",letterSpacing:".03em"}}>{t}</span>
                 ))}
               </div>
             </Reveal>
 
-            <Reveal delay={160} tag="h1" style={{fontFamily:"'Instrument Serif',serif",fontSize:"clamp(60px,7.5vw,108px)",fontWeight:400,lineHeight:.93,letterSpacing:"-.035em",color:"#ede9e2",marginBottom:0}}>
-              Saket<br/><em style={{color:"rgba(237,233,226,.3)",fontStyle:"italic"}}>Sharma.</em>
+            <Reveal delay={160} tag="h1" style={{fontFamily:"'Instrument Serif',serif",fontSize:"clamp(72px,7.5vw,120px)",fontWeight:400,lineHeight:.92,letterSpacing:"-.04em",color:"#ede9e2",marginBottom:0}}>
+              Saket<br/>
+              <em style={{color:"rgba(237,233,226,.28)",fontStyle:"italic"}}>Sharma.</em>
             </Reveal>
 
-            <Reveal delay={240} style={{marginTop:12,width:"70%",height:2,background:"linear-gradient(90deg,#6366f1,#8b5cf6,transparent)",borderRadius:999}}/>
+            <Reveal delay={230} style={{marginTop:14}}>
+              <div style={{width:200,height:2,background:"linear-gradient(90deg,#6366f1,#8b5cf6,transparent)",borderRadius:999}}/>
+            </Reveal>
 
-            <Reveal delay={300} style={{marginTop:18}}>
-              <p style={{fontSize:15,fontWeight:300,lineHeight:1.78,color:"rgba(255,255,255,.42)"}}>
-                Developer & builder who cares about the craft.<br/>
-                From <span style={{color:"#818cf8",fontWeight:400}}>AI and computer vision</span> to{" "}
-                <span style={{color:"#60a5fa",fontWeight:400}}>full-stack products</span> —<br/>
-                I ship things that actually work.
+            <Reveal delay={290} style={{marginTop:20}}>
+              <p style={{fontSize:16.5,fontWeight:300,lineHeight:1.85,color:"rgba(255,255,255,.48)",maxWidth:440}}>
+                20 y/o who loves to code. Always exploring new frameworks,{" "}
+                pushing limits, and shipping things that actually work.
               </p>
             </Reveal>
 
-            <Reveal delay={380} style={{marginTop:24,display:"flex",gap:10,flexWrap:"wrap"}}>
-              <TLink href="https://github.com/sakets-dev" icon={ghIcon} label="GitHub" tooltip="saket-dev" color="#e2e8f0"/>
+            <Reveal delay={370} style={{marginTop:26,display:"flex",gap:10,flexWrap:"wrap"}}>
+              <TLink href="https://github.com/sakets-dev" icon={ghIcon} label="GitHub" tooltip="sakets-dev" color="#e2e8f0"/>
               <TLink href="https://www.linkedin.com/in/saket-sharma-3a37871a7/" icon={liIcon} label="LinkedIn" tooltip="Saket Sharma" color="#60a5fa"/>
               <TLink href="mailto:saketshar04@gmail.com" icon={emIcon} label="Email" tooltip="saketshar04@gmail.com" color="#f59e0b"/>
             </Reveal>
           </div>
 
-          {/* RIGHT: globe — pulled close */}
-          <Reveal delay={200} style={{flex:"0 0 380px",marginLeft:"-60px"}}>
-            <ParticleGlobe/>
+          <Reveal delay={200} style={{flex:"0 0 50%",display:"flex",alignItems:"center",justifyContent:"center",userSelect:"none",paddingRight:24}}>
+            <ParticleGlobe size={580}/>
           </Reveal>
         </div>
 
-        {/* divider */}
-        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 30%,rgba(255,255,255,.06) 70%,transparent)",margin:"0 48px"}}/>
-
-        {/* ABOUT */}
-        <div id="about" style={{padding:"48px 48px 48px"}}>
-          <Reveal delay={60} style={{display:"flex",alignItems:"center",gap:18,marginBottom:28}}>
+        {/* ── ABOUT ── */}
+        <div id="about" style={{padding:"60px 64px 72px"}}>
+          <Reveal style={{display:"flex",alignItems:"center",gap:18,marginBottom:44}}>
             <span className="sl">About</span>
-            <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(255,255,255,.08),transparent)"}}/>
+            <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(255,255,255,.07),transparent)"}}/>
           </Reveal>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"start"}}>
-            <Reveal delay={80}>
-              <p style={{fontFamily:"'Instrument Serif',serif",fontSize:21,lineHeight:1.55,color:"rgba(237,233,226,.82)",fontWeight:400,letterSpacing:"-.01em",marginBottom:14}}>
-                I build with the belief that great software should feel as good as it works.
-              </p>
-              <p style={{fontSize:13.5,lineHeight:1.85,color:"rgba(255,255,255,.38)",fontWeight:300,marginBottom:10}}>
-                CS & Statistics student at the University of Toronto. I've shipped products across AI, computer vision, and full-stack web — winning hackathons along the way.
-              </p>
-              <p style={{fontSize:13.5,lineHeight:1.85,color:"rgba(255,255,255,.3)",fontWeight:300}}>
-                Off-screen I'm deep in thriller novels or lost in music while I code.
-              </p>
-            </Reveal>
-            <Reveal delay={130}>
-              <p className="sl" style={{marginBottom:14}}>Stack</p>
-              <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-                {stack.map(s=><span key={s} className="pill">{s}</span>)}
-              </div>
-            </Reveal>
-          </div>
-        </div>
 
-        {/* divider */}
-        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 30%,rgba(255,255,255,.06) 70%,transparent)",margin:"0 48px"}}/>
-
-        {/* WORK */}
-        <div id="work" style={{padding:"48px 48px 48px"}}>
-          <Reveal delay={60} style={{display:"flex",alignItems:"center",gap:18,marginBottom:6}}>
-            <span className="sl">Work</span>
-            <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(255,255,255,.08),transparent)"}}/>
-            <span style={{fontSize:10.5,color:"rgba(255,255,255,.18)"}}>click to expand</span>
-          </Reveal>
-          {works.map((w,i)=><ProjectRow key={w.title} p={w} delay={70+i*40}/>)}
-        </div>
-
-        {/* divider */}
-        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 30%,rgba(255,255,255,.06) 70%,transparent)",margin:"0 48px"}}/>
-
-        {/* CONTACT */}
-        <div id="contact" style={{padding:"48px 48px 72px"}}>
           <Reveal delay={60}>
-            <div style={{maxWidth:480,padding:"28px 32px",borderRadius:16,background:"rgba(99,102,241,.07)",border:"1px solid rgba(99,102,241,.16)"}}>
-              <p style={{fontFamily:"'Instrument Serif',serif",fontSize:23,fontWeight:400,color:"rgba(237,233,226,.85)",letterSpacing:"-.01em",marginBottom:7}}>Let's build something together.</p>
-              <p style={{fontSize:13,color:"rgba(255,255,255,.32)",fontWeight:300,lineHeight:1.7,marginBottom:18}}>Open to internships, hackathons, and interesting side projects. Always happy to chat.</p>
-              <a href="mailto:saketshar04@gmail.com"
-                style={{display:"inline-flex",alignItems:"center",gap:7,padding:"9px 19px",borderRadius:10,background:"rgba(99,102,241,.2)",border:"1px solid rgba(99,102,241,.35)",color:"#818cf8",fontSize:13,fontWeight:500,textDecoration:"none",transition:"transform .2s,box-shadow .2s"}}
-                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 24px rgba(99,102,241,.25)";}}
-                onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}}
-              >Say hello →</a>
+            <p style={{fontFamily:"'Instrument Serif',serif",fontSize:"clamp(26px,3vw,42px)",lineHeight:1.28,color:"rgba(237,233,226,.9)",fontWeight:400,letterSpacing:"-.025em",maxWidth:800,marginBottom:48}}>
+              I build with the belief that great software should feel as good as it works.
+            </p>
+          </Reveal>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20,marginBottom:48}}>
+            {[
+              {label:"Background",accent:"#818cf8",text:<>CS & Statistics at UofT. I love the intersection of math and product — always chasing that mix of elegant logic and real-world impact.</>},
+              {label:"Experience",accent:"#34d399",text:<>Attended <strong style={{color:"rgba(255,255,255,.85)",fontWeight:500}}>YC Startup School</strong> and <strong style={{color:"rgba(255,255,255,.85)",fontWeight:500}}>QSYS</strong>. Multiple hackathon wins, building and shipping under pressure.</>},
+              {label:"Right Now",accent:"#f59e0b",text:<>Working toward a startup. Exploring ideas, picking up new tools fast, and looking for the right problem to go all-in on.</>},
+            ].map(({label,accent,text},i)=>(
+              <Reveal key={label} delay={80+i*70} from={i===0?"left":i===2?"right":"bottom"}>
+                <div style={{padding:"22px 24px",borderRadius:12,background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)"}}>
+                  <div style={{width:24,height:2,background:accent,borderRadius:999,marginBottom:14}}/>
+                  <p style={{fontSize:10,letterSpacing:".13em",color:"rgba(255,255,255,.28)",fontWeight:600,textTransform:"uppercase",marginBottom:10}}>{label}</p>
+                  <p style={{fontSize:13.5,lineHeight:1.85,color:"rgba(255,255,255,.62)",fontWeight:300}}>{text}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={200}>
+            <p className="sl" style={{marginBottom:14}}>Stack</p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+              {stack.map(s=><span key={s} className="pill">{s}</span>)}
             </div>
           </Reveal>
         </div>
 
-        {/* FOOTER */}
-        <div style={{padding:"18px 48px 28px",borderTop:"1px solid rgba(255,255,255,.05)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontFamily:"'Instrument Serif',serif",fontSize:14,color:"rgba(255,255,255,.22)"}}>saket.sharma</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,.15)",letterSpacing:".04em"}}>© 2026 · React + Vite</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,.15)"}}>Toronto, CA</span>
+        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 20%,rgba(255,255,255,.06) 80%,transparent)",margin:"0 64px"}}/>
+
+        {/* ── WORK ── */}
+        <div id="work" style={{padding:"60px 64px 72px"}}>
+          <Reveal style={{display:"flex",alignItems:"center",gap:18,marginBottom:6}}>
+            <span className="sl">Selected Work</span>
+            <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(255,255,255,.07),transparent)"}}/>
+            <span style={{fontSize:9.5,color:"rgba(255,255,255,.15)",letterSpacing:".08em"}}>CLICK TO EXPAND</span>
+          </Reveal>
+          <Reveal delay={60}>
+            <p style={{fontSize:13,color:"rgba(255,255,255,.25)",fontWeight:300,marginBottom:24,marginTop:8,letterSpacing:".01em"}}>
+              Hackathon winners, CV tools, and full-stack products — built fast, shipped real.
+            </p>
+          </Reveal>
+          {works.map((w,i)=><ProjectRow key={w.title} p={w} delay={80+i*50}/>)}
+        </div>
+
+        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 20%,rgba(255,255,255,.06) 80%,transparent)",margin:"0 64px"}}/>
+
+        {/* ── FOOTER ── */}
+        <div style={{padding:"20px 64px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontFamily:"'Instrument Serif',serif",fontSize:14,color:"rgba(255,255,255,.18)"}}>saket.sharma</span>
+          <span style={{fontSize:11,color:"rgba(255,255,255,.12)",letterSpacing:".04em"}}>© 2026</span>
+          <span style={{fontSize:11,color:"rgba(255,255,255,.12)"}}>Toronto, CA</span>
         </div>
 
       </div>
