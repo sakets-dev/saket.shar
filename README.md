@@ -1,16 +1,112 @@
-# React + Vite
+# Personal Website
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository contains the source code for my personal website. The website serves as a central hub for showcasing my projects, technical skills, and work in software development, artificial intelligence, and computer science.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This website was built to present my portfolio, projects, and professional work in a clean and modern interface. It highlights my experience in software engineering, research, and hackathon projects while also serving as a place to experiment with new web technologies.
 
-## React Compiler
+The site is built using **React** and **Vite**, providing fast development, hot module reloading, and a lightweight build system.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+- Modern responsive design
+- Fast development environment with Vite
+- Built with React components
+- TailwindCSS for styling
+- Clean and modular project structure
+- Portfolio section for projects
+- Personal introduction and background
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech Stack
+
+- **React**
+- **Vite**
+- **JavaScript**
+- **TailwindCSS**
+- **HTML / CSS**
+
+## Project Structure
+
+```
+website/
+│
+├── public/              # Static assets
+├── src/                 # Main application source code
+│   ├── components/      # Reusable React components
+│   ├── pages/           # Page-level components
+│   ├── assets/          # Images and static files
+│   └── main.jsx         # Application entry point
+│
+├── index.html           # Root HTML file
+├── package.json         # Project dependencies
+├── tailwind.config.js   # Tailwind configuration
+├── vite.config.js       # Vite configuration
+└── README.md
+```
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/sakets-dev/website.git
+cd website
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+## Running the Website Locally
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The site will run at:
+
+```
+http://localhost:5173
+```
+
+## Building for Production
+
+To build the project for deployment:
+
+```bash
+npm run build
+```
+
+The production build will be generated in the `dist/` folder.
+
+## Deployment
+
+This website can be deployed using platforms such as:
+
+- Vercel
+- Netlify
+- GitHub Pages
+- Any static hosting provider
+
+## Purpose
+
+This website is used to:
+
+- Showcase my personal and academic projects
+- Highlight technical skills
+- Document experiments with new technologies
+- Provide a central portfolio for recruiters and collaborators
+
+## Author
+
+**Saket Sharma**
+
+Computer Science & Statistics Student  
+University of Toronto
+
+GitHub: https://github.com/sakets-dev
