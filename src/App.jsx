@@ -59,21 +59,6 @@ function DeskLamp({ dark, onToggle }) {
   );
 }
 
-/* ─── LOGO — green S matching site accent ─── */
-function Logo({ dark }) {
-  const fg = dark ? "#7ec87a" : "#3a7a40";
-  const bg = dark ? "rgba(60,160,60,0.15)" : "rgba(40,120,40,0.1)";
-  const bd = dark ? "rgba(100,200,100,0.28)" : "rgba(60,140,60,0.22)";
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, border: `1.5px solid ${bd}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 700, color: fg, letterSpacing: "-.03em", lineHeight: 1, userSelect: "none" }}>S</span>
-      </div>
-      <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 600, color: fg, letterSpacing: "-.01em" }}>saket.shar</span>
-    </div>
-  );
-}
-
 /* ─── REVEAL ─── */
 function Reveal({ children, delay = 0, style = {}, as: Tag = "div" }) {
   const [v, setV] = useState(false);
@@ -113,7 +98,7 @@ function ProjectCard({ p, dark }) {
   const cardBd = dark ? "rgba(80,160,80,.18)" : "#d8eed8";
   const cardShadow = dark ? "0 8px 32px rgba(0,0,0,.4)" : "0 8px 32px rgba(60,140,60,.07)";
   const titleCol = dark ? "#e8f5e8" : "#1e3e24";
-  const subCol = dark ? "#8ab090" : "#3a5a40";
+  const subCol = dark ? "#8ab090" : "#2a4a32";
   const techCol = dark ? "#7ec87a" : "#3a6a40";
   const backBg = dark ? "linear-gradient(135deg,#0e1a10,#162418)" : "linear-gradient(135deg,#2a4a30,#3a6a40)";
   return (
@@ -129,12 +114,12 @@ function ProjectCard({ p, dark }) {
             </div>
           </div>
           <h3 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 600, color: titleCol, lineHeight: 1.3, marginBottom: 10, letterSpacing: "-.01em" }}>{p.title}</h3>
-          <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 12.5, lineHeight: 1.75, color: subCol, fontWeight: 300, flex: 1, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{p.about}</p>
+          <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, lineHeight: 1.75, color: subCol, fontWeight: 400, flex: 1, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{p.about}</p>
           <div style={{ marginTop: 10, fontFamily: "'DM Mono',monospace", fontSize: 8, color: dark ? "rgba(126,200,122,.35)" : "#80a880", letterSpacing: ".1em" }}>TAP TO SEE MORE</div>
         </div>
         <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", background: backBg, borderRadius: 14, boxShadow: cardShadow, padding: "22px 20px", transform: "rotateY(180deg)", display: "flex", flexDirection: "column" }}>
           <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 600, color: "#c8f0c8", marginBottom: 8 }}>{p.title}</div>
-          <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 11.5, lineHeight: 1.75, color: "rgba(220,255,220,.75)", fontWeight: 300, flex: 1, overflow: "hidden" }}>{p.about}</p>
+          <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 12, lineHeight: 1.75, color: "rgba(220,255,220,.85)", fontWeight: 400, flex: 1, overflow: "hidden" }}>{p.about}</p>
           <div style={{ marginTop: 10 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
               {p.tech.split(",").slice(0, 5).map((t, i) => (
@@ -164,12 +149,12 @@ function ProjectCard({ p, dark }) {
 function ExperienceTimeline({ dark }) {
   const [active, setActive] = useState(null);
   const experiences = [
-    { role: "Incomfing Software Development Engineer Intern", company: "Amazon", period: "Jun 2026 – Sep 2026", location: "Vancouver / Remote", color: "#ff9900", points: ["Contributing to development and optimization of internal AI tools and scalable cloud infrastructure using AWS services.", "Collaborating with engineering teams to implement efficient backend solutions and enhance data processing pipelines."] },
+    { role: "Software Development Engineer Intern", company: "Amazon", period: "Jun 2026 – Sep 2026", location: "Vancouver / Remote", color: "#ff9900", points: ["Contributing to development and optimization of internal AI tools and scalable cloud infrastructure using AWS services.", "Collaborating with engineering teams to implement efficient backend solutions and enhance data processing pipelines."] },
     { role: "Software Engineer", company: "COBWEB", period: "Sep 2023 – May 2025", location: "Waterloo, Ontario", color: "#7ec87a", points: ["Migrated core codebase from Java to Python, increasing AI/ML model flexibility and supporting implementation of sophisticated agent behaviors and collaborative development protocols.", "Established CI/CD pipelines to enhance model scalability and reliability through testing and agile deployment strategies."] },
     { role: "Camp Counsellor", company: "Heartland Church", period: "Jun 2022 – Aug 2022", location: "Mississauga, Ontario", color: "#60a5fa", points: ["Led a team of 3 counselors to design and implement age-appropriate activities fostering personal growth, skill development, and team building for 100+ campers — resulting in a 15% increase in positive feedback.", "Pioneered a new 'Leadership Academy' program consisting of 10 age-appropriate activities teaching math, science, and leadership skills to 60 campers."] },
   ];
   const titleCol = dark ? "#e8f5e8" : "#1a3020";
-  const subCol = dark ? "#8ab090" : "#3a5a40";
+  const subCol = dark ? "#8ab090" : "#2a4a30";
   const lineBg = dark ? "rgba(80,160,80,.2)" : "#c8e0c8";
   const cardBg = dark ? "#0f1a11" : "#ffffff";
   const cardBd = dark ? "rgba(80,160,80,.2)" : "#d8eed8";
@@ -184,19 +169,19 @@ function ExperienceTimeline({ dark }) {
             <div onClick={() => setActive(isOpen ? null : i)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0", cursor: "pointer", borderBottom: `1px solid ${isOpen ? "transparent" : lineBg}` }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 600, color: titleCol, letterSpacing: "-.02em" }}>{exp.role}</span>
-                <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 500, color: exp.color, opacity: .9 }}>{exp.company}</span>
+                <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 500, color: exp.color, opacity: .9 }}>{exp.company}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0, marginLeft: 20 }}>
-                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: ".1em", color: dark ? "#6a8a70" : "#5a7a60" }}>{exp.period}</span>
+                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, letterSpacing: ".1em", color: dark ? "#6a8a70" : "#3a5a40" }}>{exp.period}</span>
                 <span style={{ fontSize: 18, color: dark ? "#5a8060" : "#6a9070", transition: "transform .3s", display: "inline-block", transform: isOpen ? "rotate(45deg)" : "rotate(0deg)", lineHeight: 1 }}>+</span>
               </div>
             </div>
             <div style={{ overflow: "hidden", maxHeight: isOpen ? 320 : 0, opacity: isOpen ? 1 : 0, transition: "max-height .45s cubic-bezier(.16,1,.3,1), opacity .3s ease" }}>
               <div style={{ background: cardBg, border: `1px solid ${cardBd}`, borderLeft: `3px solid ${exp.color}`, borderRadius: 10, padding: "18px 20px", marginBottom: 10 }}>
-                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9.5, letterSpacing: ".1em", color: dark ? "#567060" : "#7a9a80", marginBottom: 14, textTransform: "uppercase" }}>{exp.location}</div>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: ".1em", color: dark ? "#567060" : "#4a6a50", marginBottom: 14, textTransform: "uppercase" }}>{exp.location}</div>
                 <ul style={{ paddingLeft: 0, margin: 0, listStyle: "none" }}>
                   {exp.points.map((pt, pi) => (
-                    <li key={pi} style={{ display: "flex", gap: 10, fontFamily: "'Outfit',sans-serif", fontSize: 14, lineHeight: 1.78, color: subCol, fontWeight: 300, marginBottom: pi < exp.points.length - 1 ? 12 : 0 }}>
+                    <li key={pi} style={{ display: "flex", gap: 10, fontFamily: "'Outfit',sans-serif", fontSize: 15, lineHeight: 1.78, color: subCol, fontWeight: 400, marginBottom: pi < exp.points.length - 1 ? 12 : 0 }}>
                       <span style={{ color: exp.color, flexShrink: 0, marginTop: 4, fontSize: 10 }}>▸</span>{pt}
                     </li>
                   ))}
@@ -210,13 +195,13 @@ function ExperienceTimeline({ dark }) {
   );
 }
 
-/* ─── SECTION LABEL — no hints, no "extra" ─── */
+/* ─── SECTION LABEL ─── */
 function SectionLabel({ num, label, dark }) {
   const col = dark ? "rgba(80,160,80,.18)" : "#c8e0c8";
-  const textCol = dark ? "rgba(160,220,160,.75)" : "#4a7a50";
+  const textCol = dark ? "rgba(160,220,160,.75)" : "#3a6040";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 52 }}>
-      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".22em", color: textCol, textTransform: "uppercase", whiteSpace: "nowrap" }}>{num} / {label}</span>
+      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: ".22em", color: textCol, textTransform: "uppercase", whiteSpace: "nowrap" }}>{num} / {label}</span>
       <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${col},transparent)` }} />
     </div>
   );
@@ -224,10 +209,10 @@ function SectionLabel({ num, label, dark }) {
 
 /* ─── MAIN APP ─── */
 export default function App() {
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(false);
   const bg = dark ? "#0b1410" : "#f4fbf4";
   const fg = dark ? "#d8f0d8" : "#1a3020";
-  const sub = dark ? "#7a9a80" : "#4a6a50";
+  const sub = dark ? "#7a9a80" : "#2e5038";
   const border = dark ? "rgba(80,160,80,.15)" : "#d0e8d0";
   const navBg = dark ? "rgba(11,20,16,.92)" : "rgba(244,251,244,.94)";
   const accent = dark ? "#7ec87a" : "#3a7a40";
@@ -261,7 +246,8 @@ export default function App() {
 
         {/* NAV */}
         <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 52px", height: 58, background: navBg, borderBottom: `1px solid ${border}`, backdropFilter: "blur(16px)", transition: "background .5s, border-color .4s" }}>
-          <Logo dark={dark} />
+          {/* Name instead of logo */}
+          <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 600, color: dark ? "#7ec87a" : "#2a5a30", letterSpacing: "-.01em" }}>Saket Sharma</span>
           <div style={{ display: "flex", gap: 2 }}>
             {[["About", "#about"], ["Experience", "#experience"], ["Work", "#work"]].map(([l, h]) => (
               <a key={l} href={h} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 400, color: sub, padding: "6px 14px", borderRadius: 6, transition: "color .2s, background .2s" }}
@@ -283,16 +269,16 @@ export default function App() {
             <h1 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "clamp(68px,9vw,114px)", lineHeight: .91, color: dark ? "#eaf5ea" : "#1a3020", letterSpacing: "-.04em", marginBottom: 26 }}>
               Saket<span style={{ color: accent }}>.</span>
             </h1>
+            {/* Incoming SDE badge — dot removed */}
             <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: dark ? "rgba(255,153,0,.08)" : "rgba(255,153,0,.08)", border: `1px solid ${dark ? "rgba(255,153,0,.25)" : "rgba(255,153,0,.38)"}`, borderRadius: 6, padding: "8px 16px", marginBottom: 28 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff9900" }} />
               <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13.5, fontWeight: 500, color: dark ? "#ffba50" : "#a06010" }}>Incoming SDE @ Amazon, 2026</span>
             </div>
-            <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 16, fontWeight: 300, lineHeight: 1.8, color: dark ? "#9abaa0" : "#2a4a30", maxWidth: 420, marginBottom: 32, transition: "color .4s" }}>
+            <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 400, lineHeight: 1.8, color: dark ? "#9abaa0" : "#1e3828", maxWidth: 420, marginBottom: 32, transition: "color .4s" }}>
               CS & Statistics at the University of Toronto. I build software that's elegant, fast, and actually ships.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 36 }}>
               {["CS + Statistics", "University of Toronto"].map(t => (
-                <span key={t} style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".1em", color: dark ? "#6a9a70" : "#4a7a50", background: dark ? "rgba(80,160,80,.1)" : "#e8f8e8", border: `1px solid ${border}`, padding: "5px 12px", borderRadius: 3 }}>{t}</span>
+                <span key={t} style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: ".1em", color: dark ? "#6a9a70" : "#2e5a38", background: dark ? "rgba(80,160,80,.1)" : "#e8f8e8", border: `1px solid ${border}`, padding: "5px 12px", borderRadius: 3 }}>{t}</span>
               ))}
             </div>
             <a href="#work" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 500, color: "#fff", background: dark ? "linear-gradient(135deg,#2a5a30,#3a7a40)" : "linear-gradient(135deg,#2a5a30,#4a9a50)", padding: "13px 30px", borderRadius: 10, boxShadow: dark ? "0 6px 20px rgba(40,120,50,.3)" : "0 6px 20px rgba(60,160,60,.25)", transition: "transform .2s, box-shadow .2s", letterSpacing: ".01em" }}
@@ -320,23 +306,23 @@ export default function App() {
             <Reveal delay={60}>
               <h2 style={{ fontFamily: "'Outfit',sans-serif", fontSize: "clamp(24px,2.8vw,38px)", fontWeight: 600, lineHeight: 1.25, color: dark ? "#d8ecd8" : "#1a3020", letterSpacing: "-.02em", marginBottom: 20 }}>
                 CS & Statistics at UofT.<br />
-                <span style={{ fontWeight: 300, color: dark ? "#8aaa90" : "#4a6a50" }}>I love the intersection of math and product.</span>
+                <span style={{ fontWeight: 300, color: dark ? "#8aaa90" : "#2e4a38" }}>I love the intersection of math and product.</span>
               </h2>
-              <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, lineHeight: 1.85, color: dark ? "#9abaa0" : "#2a4a30", fontWeight: 300, marginBottom: 16 }}>
-                I build with the belief that great software should feel as good as it works. Attended <strong style={{ color: accent, fontWeight: 500 }}>YC Startup School</strong> and <strong style={{ color: accent, fontWeight: 500 }}>QSYS</strong> — multiple hackathon wins, building and shipping under pressure.
+              <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 16, lineHeight: 1.85, color: dark ? "#9abaa0" : "#1e3828", fontWeight: 400, marginBottom: 16 }}>
+                I build with the belief that great software should feel as good as it works. Attended <strong style={{ color: accent, fontWeight: 600 }}>YC Startup School</strong> and <strong style={{ color: accent, fontWeight: 600 }}>QSYS</strong> — multiple hackathon wins, building and shipping under pressure.
               </p>
-              <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, lineHeight: 1.85, color: dark ? "#6a8a70" : "#5a7a60", fontWeight: 300 }}>
+              <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 16, lineHeight: 1.85, color: dark ? "#6a8a70" : "#2a4a34", fontWeight: 400 }}>
                 Now heading into my first SDE role at Amazon. Always looking for the next interesting problem to solve.
               </p>
             </Reveal>
             <Reveal delay={120}>
               <div style={{ background: dark ? "rgba(80,160,80,.05)" : "#eef8ee", border: `1px solid ${border}`, borderRadius: 14, padding: "26px 22px" }}>
-                <p style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".2em", color: dark ? "rgba(160,220,160,.55)" : "#5a8a60", textTransform: "uppercase", marginBottom: 16 }}>Stack</p>
+                <p style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: ".2em", color: dark ? "rgba(160,220,160,.55)" : "#3a6a44", textTransform: "uppercase", marginBottom: 16 }}>Stack</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                   {stack.map(s => (
-                    <span key={s} style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: dark ? "#6a9a70" : "#4a7a50", background: dark ? "rgba(80,160,80,.1)" : "#fff", border: `1px solid ${dark ? "rgba(80,160,80,.2)" : "#c8e0c8"}`, padding: "5px 11px", borderRadius: 5, transition: "background .2s, color .2s, transform .2s", cursor: "default" }}
-                      onMouseEnter={e => { e.currentTarget.style.background = dark ? "rgba(80,160,80,.22)" : "#d8f0d8"; e.currentTarget.style.color = dark ? "#b0e8b0" : "#2a5a30"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = dark ? "rgba(80,160,80,.1)" : "#fff"; e.currentTarget.style.color = dark ? "#6a9a70" : "#4a7a50"; e.currentTarget.style.transform = "none"; }}>
+                    <span key={s} style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: dark ? "#6a9a70" : "#2a5a34", background: dark ? "rgba(80,160,80,.1)" : "#fff", border: `1px solid ${dark ? "rgba(80,160,80,.2)" : "#c8e0c8"}`, padding: "5px 11px", borderRadius: 5, transition: "background .2s, color .2s, transform .2s", cursor: "default" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = dark ? "rgba(80,160,80,.22)" : "#d8f0d8"; e.currentTarget.style.color = dark ? "#b0e8b0" : "#1a4024"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = dark ? "rgba(80,160,80,.1)" : "#fff"; e.currentTarget.style.color = dark ? "#6a9a70" : "#2a5a34"; e.currentTarget.style.transform = "none"; }}>
                       {s}
                     </span>
                   ))}
