@@ -1,397 +1,370 @@
 import { useEffect, useRef, useState } from "react";
 
-/* ─── CURSOR TRAIL ─── */
-function CursorTrail() {
-  const canvasRef = useRef(null);
-  const dots = useRef([]);
+/* ─── DESK LAMP ─── */
+function DeskLamp({ dark, onToggle }) {
+  const [pulling, setPulling] = useState(false);
+  const [swingAngle, setSwingAngle] = useState(0);
+  const swingRef = useRef({ angle: 0, vel: 0 });
+  const rafRef = useRef(null);
+
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    let raf;
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-    resize();
-    window.addEventListener("resize", resize);
-    const onMove = (e) => {
-      for (let i = 0; i < 3; i++)
-        dots.current.push({ x: e.clientX+(Math.random()-.5)*10, y: e.clientY+(Math.random()-.5)*10, r: Math.random()*2.2+.5, alpha:.5, vx:(Math.random()-.5)*.5, vy:(Math.random()-.5)*.5-.3 });
+    const tick = () => {
+      if (!pulling) {
+        swingRef.current.vel += -0.014 * Math.sin(swingRef.current.angle);
+        swingRef.current.vel *= 0.95;
+        swingRef.current.angle += swingRef.current.vel;
+        setSwingAngle(swingRef.current.angle);
+      }
+      rafRef.current = requestAnimationFrame(tick);
     };
-    window.addEventListener("mousemove", onMove);
-    const draw = () => {
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      dots.current = dots.current.filter(d=>d.alpha>.01);
-      for(const d of dots.current){ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);ctx.fillStyle=`rgba(160,190,255,${d.alpha})`;ctx.fill();d.x+=d.vx;d.y+=d.vy;d.alpha*=.87;d.r*=.97;}
-      raf=requestAnimationFrame(draw);
-    };
-    draw();
-    return()=>{window.removeEventListener("resize",resize);window.removeEventListener("mousemove",onMove);cancelAnimationFrame(raf);};
-  },[]);
-  return <canvas ref={canvasRef} style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9998}}/>;
-}
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [pulling]);
 
-/* ─── 3D GLOBE ─── */
-function ParticleGlobe({ size = 520 }) {
-  const canvasRef = useRef(null);
-  const s = useRef({ rotX:0.3, rotY:0, velX:0, velY:0.006, dragging:false, lastX:0, lastY:0 });
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const pad=44, W=size+pad*2, H=size+pad*2, R=size*0.46;
-    canvas.width=W; canvas.height=H;
-    const pts=[], golden=Math.PI*(3-Math.sqrt(5));
-    for(let i=0;i<340;i++){const y=1-(i/339)*2,r=Math.sqrt(1-y*y),th=golden*i;pts.push({ox:Math.cos(th)*r,oy:y,oz:Math.sin(th)*r});}
-    for(let i=0;i<60;i++){const u=Math.random(),v=Math.random(),th=2*Math.PI*u,ph=Math.acos(2*v-1);pts.push({ox:Math.sin(ph)*Math.cos(th),oy:Math.cos(ph),oz:Math.sin(ph)*Math.sin(th)});}
-    let raf;
-    const draw=()=>{
-      ctx.clearRect(0,0,W,H);
-      const cx=W/2,cy=H/2,st=s.current;
-      if(!st.dragging){
-        // gradually ease velY back toward base speed 0.006, velX back to 0
-        st.velY += (0.006 - st.velY) * 0.012;
-        st.velX *= 0.97;
-        st.rotY += st.velY;
-        st.rotX += st.velX;
-      }
-      const cX=Math.cos(st.rotX),sX=Math.sin(st.rotX),cY=Math.cos(st.rotY),sY=Math.sin(st.rotY);
-      const proj=pts.map(p=>{
-        const x=p.ox*cY-p.oz*sY,z=p.ox*sY+p.oz*cY,y=p.oy;
-        const y2=y*cX-z*sX,z2=y*sX+z*cX,sc=(z2+2.4)/3.4;
-        return{sx:cx+x*R*sc,sy:cy+y2*R*sc,z:z2,sc};
-      }).sort((a,b)=>a.z-b.z);
-      const palette=[[99,102,241],[139,92,246],[56,189,248],[52,211,153],[251,113,133],[251,191,36],[34,211,238]];
-      const front=proj.filter(p=>p.z>0);
-      for(let i=0;i<front.length;i++)for(let j=i+1;j<front.length;j++){
-        const dx=front[i].sx-front[j].sx,dy=front[i].sy-front[j].sy,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<46){
-          const colorIdx=Math.floor(((front[i].z+1)/2*3+front[i].sx/W*4))%palette.length;
-          const [r,g,b]=palette[colorIdx];
-          const alpha=(1-d/46)*.38*Math.min(front[i].sc,front[j].sc);
-          ctx.beginPath();ctx.moveTo(front[i].sx,front[i].sy);ctx.lineTo(front[j].sx,front[j].sy);
-          ctx.strokeStyle=`rgba(${r},${g},${b},${alpha})`;ctx.lineWidth=.8;ctx.stroke();
-        }
-      }
-      for(const p of proj){
-        const t=(p.z+1)/2;
-        const ci=Math.floor((p.sx/W*4+p.sy/H*3))%palette.length;
-        const [r,g,b]=palette[ci];
-        ctx.beginPath();ctx.arc(p.sx,p.sy,Math.max(p.sc*1.1,.4),0,Math.PI*2);
-        ctx.fillStyle=`rgba(${r},${g},${b},${(t*.85+.12)*p.sc})`;ctx.fill();
-      }
-      // Glow based on actual point positions — accumulate color per screen region
-      // Only use edge points (close to globe surface) for glow
-      const edgePts = proj.filter(p => {
-        const dx=p.sx-cx, dy=p.sy-cy, dist=Math.sqrt(dx*dx+dy*dy);
-        return dist > R*0.7; // only outer ring of points
-      });
-      for(const p of edgePts){
-        const ci=Math.floor((p.sx/W*4+p.sy/H*3))%palette.length;
-        const [gr,gg,gb]=palette[ci];
-        const brightness = (p.z+1)/2; // front-facing points glow more
-        const spot=ctx.createRadialGradient(p.sx,p.sy,0,p.sx,p.sy,R*0.22);
-        spot.addColorStop(0,`rgba(${gr},${gg},${gb},${0.018*brightness})`);
-        spot.addColorStop(0.35,`rgba(${gr},${gg},${gb},${0.006*brightness})`);
-        spot.addColorStop(0.7,`rgba(${gr},${gg},${gb},${0.002*brightness})`);
-        spot.addColorStop(1,`rgba(${gr},${gg},${gb},0)`);
-        ctx.beginPath();ctx.arc(p.sx,p.sy,R*0.22,0,Math.PI*2);
-        ctx.fillStyle=spot;ctx.fill();
-      }
-      raf=requestAnimationFrame(draw);
-    };
-    draw();
-    const st=s.current;
-    const dn=(e)=>{st.dragging=true;st.lastX=e.clientX??e.touches?.[0]?.clientX;st.lastY=e.clientY??e.touches?.[0]?.clientY;};
-    const mv=(e)=>{if(!st.dragging)return;const x=e.clientX??e.touches?.[0]?.clientX,y=e.clientY??e.touches?.[0]?.clientY;st.velY=(x-st.lastX)*.01;st.velX=(y-st.lastY)*.01;st.rotY+=st.velY;st.rotX+=st.velX;st.lastX=x;st.lastY=y;};
-    const up=()=>{st.dragging=false;};
-    canvas.addEventListener("mousedown",dn);canvas.addEventListener("touchstart",dn,{passive:true});
-    window.addEventListener("mousemove",mv);window.addEventListener("touchmove",mv,{passive:true});
-    window.addEventListener("mouseup",up);window.addEventListener("touchend",up);
-    return()=>{cancelAnimationFrame(raf);canvas.removeEventListener("mousedown",dn);canvas.removeEventListener("touchstart",dn);window.removeEventListener("mousemove",mv);window.removeEventListener("touchmove",mv);window.removeEventListener("mouseup",up);window.removeEventListener("touchend",up);};
-  },[]);
-  return <canvas ref={canvasRef} style={{cursor:"grab",display:"block"}}/>;
-}
+  const handleClick = () => {
+    setPulling(true);
+    swingRef.current.vel = 0.22;
+    setTimeout(() => { setPulling(false); onToggle(); }, 200);
+  };
 
-/* ─── REVEAL (intersection observer) ─── */
-function Reveal({children,delay=0,style={},tag="div",from="bottom"}){
-  const ref=useRef(null);
-  const[v,setV]=useState(false);
-  useEffect(()=>{
-    const el=ref.current;
-    if(!el)return;
-    const obs=new IntersectionObserver(([e])=>{if(e.isIntersecting){setTimeout(()=>setV(true),delay);obs.disconnect();}},{threshold:0.1});
-    obs.observe(el);
-    return()=>obs.disconnect();
-  },[delay]);
-  const Tag=tag;
-  const init=from==="left"?"translateX(-24px)":from==="right"?"translateX(24px)":"translateY(20px)";
-  return<Tag ref={ref} style={{opacity:v?1:0,transform:v?"translate(0)":init,transition:`opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1)`,transitionDelay:`${delay}ms`,...style}}>{children}</Tag>;
-}
+  const base = dark ? "#1c2a20" : "#2d4a35";
+  const arm = dark ? "#243028" : "#2d4a35";
+  const shade1 = dark ? "#1a2e22" : "#2a4432";
+  const shade2 = dark ? "#243028" : "#355440";
+  const bulb = dark ? "#2a3830" : "#d4f87a";
+  const stringCol = dark ? "#2e4436" : "#4a7a54";
 
-/* ─── GRID BG ─── */
-function GridBg(){
-  return(
-    <div style={{position:"fixed",inset:0,zIndex:0,pointerEvents:"none"}}>
-      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",backgroundSize:"44px 44px",maskImage:"radial-gradient(ellipse 90% 80% at 50% 40%, black 20%, transparent 100%)",WebkitMaskImage:"radial-gradient(ellipse 90% 80% at 50% 40%, black 20%, transparent 100%)"}}/>
+  return (
+    <div onClick={handleClick} title={dark ? "Turn on" : "Turn off"}
+      style={{ width: 220, height: 380, position: "relative", cursor: "pointer", userSelect: "none", flexShrink: 0 }}>
+      {!dark && <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: 300, height: 55, background: "radial-gradient(ellipse,rgba(180,240,80,.22) 0%,transparent 80%)", borderRadius: "50%", pointerEvents: "none" }} />}
+      <div style={{ position: "absolute", bottom: 0, left: "50%", transform: `translateX(-50%) rotate(${swingAngle * 5}deg)`, transformOrigin: "50% 100%", transition: pulling ? "none" : "transform .04s", width: 200 }}>
+        <svg width="200" height="380" viewBox="0 0 200 380" style={{ display: "block" }}>
+          <ellipse cx="100" cy="365" rx="60" ry="13" fill={shade1} />
+          <rect x="82" y="340" width="36" height="28" rx="6" fill={base} />
+          <rect x="95" y="220" width="10" height="124" rx="5" fill={arm} />
+          <path d="M100,220 C100,170 65,152 42,122" stroke={arm} strokeWidth="9" strokeLinecap="round" fill="none" />
+          <circle cx="42" cy="122" r="8" fill={shade2} />
+          <polygon points="8,88 76,106 76,152 8,134" fill={shade1} />
+          <polygon points="11,91 72,108 72,148 11,130" fill={shade2} opacity="0.6" />
+          <circle cx="44" cy="121" r="11" fill={bulb} style={{ filter: dark ? "none" : "drop-shadow(0 0 14px rgba(180,240,80,.9))" }} />
+        </svg>
+        {!dark && <div style={{ position: "absolute", top: 95, left: -80, width: 0, height: 0, borderTop: "65px solid transparent", borderBottom: "65px solid transparent", borderRight: "140px solid rgba(190,250,90,.06)", pointerEvents: "none" }} />}
+        <svg width="30" height={pulling ? 85 : 70} viewBox={`0 0 30 ${pulling ? 85 : 70}`} style={{ position: "absolute", top: 148, left: 44, transition: "height .15s" }}>
+          <line x1="15" y1="0" x2={15 + swingAngle * 5} y2={pulling ? 76 : 60} stroke={stringCol} strokeWidth="2" strokeDasharray="4,4" />
+          <circle cx={15 + swingAngle * 5} cy={pulling ? 76 : 60} r="5" fill={shade2} />
+        </svg>
+      </div>
     </div>
   );
 }
 
-/* ─── PROJECT ROW ─── */
-function ProjectRow({p,delay}){
-  const[open,setOpen]=useState(false);
-  const[hovered,setHovered]=useState(false);
-  return(
-    <Reveal delay={delay}>
-      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",overflow:"hidden"}}>
-        {/* Header row */}
-        <div
-          onClick={()=>setOpen(o=>!o)}
-          onMouseEnter={()=>setHovered(true)}
-          onMouseLeave={()=>setHovered(false)}
-          style={{
-            display:"flex",alignItems:"center",
-            padding:"20px 16px",
-            cursor:"pointer",
-            background:hovered?"rgba(255,255,255,.02)":"transparent",
-            transform:hovered?"translateX(8px)":"translateX(0)",
-            transition:"transform .4s cubic-bezier(.16,1,.3,1),background .25s",
-          }}
-        >
-          <span style={{width:6,height:6,borderRadius:"50%",background:p.accent,display:"inline-block",marginRight:20,flexShrink:0,boxShadow:`0 0 8px ${p.accent}aa`,transition:"transform .3s",transform:hovered?"scale(1.5)":"scale(1)"}}/>
-          <span style={{fontFamily:"'Instrument Serif',serif",fontSize:23,fontWeight:400,color:hovered?"#ede9e2":"rgba(237,233,226,.82)",letterSpacing:"-.025em",flex:1,transition:"color .25s"}}>{p.title}</span>
-          {p.winner&&<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 9px",borderRadius:999,fontSize:9.5,fontWeight:700,letterSpacing:".08em",background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.28)",color:"#fbbf24",marginRight:12,whiteSpace:"nowrap"}}>🏆 WINNER</span>}
-          <span style={{fontSize:10.5,fontWeight:500,padding:"2px 9px",borderRadius:999,background:p.tagBg,border:`1px solid ${p.tagBorder}`,color:p.accent,marginRight:14,letterSpacing:".04em"}}>{p.tag}</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,.2)",marginRight:14,fontWeight:300}}>{p.year}</span>
-          {/* Animated chevron */}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" style={{transition:"transform .4s cubic-bezier(.16,1,.3,1)",transform:open?"rotate(180deg)":"rotate(0deg)",flexShrink:0}}>
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </div>
-
-        {/* Expandable content — animates in with stagger */}
-        <div style={{
-          display:"grid",
-          gridTemplateRows:open?"1fr":"0fr",
-          transition:"grid-template-rows .5s cubic-bezier(.16,1,.3,1)",
-        }}>
-          <div style={{overflow:"hidden"}}>
-            <div style={{
-              padding:"0 16px 24px 42px",
-              display:"grid",gridTemplateColumns:"1fr auto",gap:24,alignItems:"start",
-              opacity:open?1:0,transform:open?"translateY(0)":"translateY(-8px)",
-              transition:`opacity .4s ease ${open?.08:0}s, transform .4s cubic-bezier(.16,1,.3,1) ${open?.08:0}s`,
-            }}>
-              <div>
-                <p style={{fontSize:13.5,lineHeight:1.85,color:"rgba(255,255,255,.5)",fontWeight:300,marginBottom:14}}>{p.about}</p>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {p.tech.split(",").map((t,i)=>(
-                    <span key={i} style={{
-                      padding:"3px 10px",borderRadius:999,fontSize:10.5,fontWeight:500,
-                      background:p.tagBg,border:`1px solid ${p.tagBorder}`,color:p.accent,
-                      opacity:open?1:0,transform:open?"translateY(0)":"translateY(4px)",
-                      transition:`opacity .3s ease ${open?(.12+i*.03):.0}s, transform .3s ease ${open?(.12+i*.03):.0}s`,
-                    }}>{t.trim()}</span>
-                  ))}
-                </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0,marginTop:2}}>
-                <a href={p.link} target="_blank" rel="noopener noreferrer"
-                  style={{display:"inline-flex",alignItems:"center",gap:5,padding:"8px 14px",borderRadius:9,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.1)",color:"rgba(255,255,255,.65)",fontSize:12,fontWeight:500,textDecoration:"none",whiteSpace:"nowrap",transition:"background .2s,color .2s",opacity:open?1:0,transform:open?"translateX(0)":"translateX(8px)",transition2:`opacity .35s ease ${open?.18:0}s`}}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,.1)";e.currentTarget.style.color="#fff";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,.05)";e.currentTarget.style.color="rgba(255,255,255,.65)";}}
-                >GitHub ↗</a>
-                {p.devpost&&<a href={p.devpost} target="_blank" rel="noopener noreferrer"
-                  style={{display:"inline-flex",alignItems:"center",gap:5,padding:"8px 14px",borderRadius:9,background:"rgba(236,72,153,.08)",border:"1px solid rgba(236,72,153,.22)",color:"#f472b6",fontSize:12,fontWeight:500,textDecoration:"none",whiteSpace:"nowrap",transition:"background .2s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="rgba(236,72,153,.16)"}
-                  onMouseLeave={e=>e.currentTarget.style.background="rgba(236,72,153,.08)"}
-                >Devpost ↗</a>}
-              </div>
-            </div>
-          </div>
-        </div>
+/* ─── LOGO — green S matching site accent ─── */
+function Logo({ dark }) {
+  const fg = dark ? "#7ec87a" : "#3a7a40";
+  const bg = dark ? "rgba(60,160,60,0.15)" : "rgba(40,120,40,0.1)";
+  const bd = dark ? "rgba(100,200,100,0.28)" : "rgba(60,140,60,0.22)";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: 34, height: 34, borderRadius: 9, background: bg, border: `1.5px solid ${bd}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 700, color: fg, letterSpacing: "-.03em", lineHeight: 1, userSelect: "none" }}>S</span>
       </div>
-    </Reveal>
+      <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 600, color: fg, letterSpacing: "-.01em" }}>saket.shar</span>
+    </div>
   );
 }
 
-/* ─── TOOLTIP LINK ─── */
-function TLink({href,icon,label,tooltip,color}){
-  const[show,setShow]=useState(false);
-  return(
+/* ─── REVEAL ─── */
+function Reveal({ children, delay = 0, style = {}, as: Tag = "div" }) {
+  const [v, setV] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setTimeout(() => setV(true), delay); obs.disconnect(); }
+    }, { threshold: 0.05 });
+    obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [delay]);
+  return (
+    <Tag ref={ref} style={{ opacity: v ? 1 : 0, transform: v ? "none" : "translateY(18px)", transition: `opacity .8s cubic-bezier(.16,1,.3,1) ${delay}ms, transform .8s cubic-bezier(.16,1,.3,1) ${delay}ms`, ...style }}>
+      {children}
+    </Tag>
+  );
+}
+
+/* ─── SOCIAL LINK ─── */
+function SocialLink({ href, icon, dark }) {
+  const [hov, setHov] = useState(false);
+  return (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}
-      style={{position:"relative",display:"inline-flex",alignItems:"center",gap:7,padding:"9px 18px",borderRadius:10,fontSize:13,fontWeight:500,textDecoration:"none",color,background:`${color}12`,border:`1px solid ${color}25`,transition:"transform .2s,background .2s"}}
-    >
-      {icon}{label}
-      {show&&<span style={{position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",background:"#1a1a24",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,padding:"5px 11px",fontSize:11,color:"rgba(255,255,255,.6)",whiteSpace:"nowrap",pointerEvents:"none",boxShadow:"0 8px 24px rgba(0,0,0,.5)",animation:"tip .15s ease forwards",zIndex:100}}>{tooltip}</span>}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", border: `1px solid ${dark ? (hov ? "rgba(100,200,100,.4)" : "rgba(80,160,80,.2)") : (hov ? "#90c890" : "#c0d8c0")}`, color: dark ? (hov ? "#90d890" : "#6a9a70") : (hov ? "#3a7a40" : "#5a7a60"), background: hov ? (dark ? "rgba(80,180,80,.12)" : "rgba(60,140,60,.08)") : "transparent", transition: "all .22s", textDecoration: "none", fontSize: 14 }}>
+      {icon}
     </a>
   );
 }
 
-/* ─── APP ─── */
-export default function App(){
-  const[pos,setPos]=useState({x:-9999,y:-9999});
-  useEffect(()=>{const fn=e=>setPos({x:e.clientX,y:e.clientY});window.addEventListener("mousemove",fn);return()=>window.removeEventListener("mousemove",fn);},[]);
-
-  const works=[
-    {title:"Zed.AI – Your AI Study Buddy",tag:"AI / Voice",year:"2025",winner:true,accent:"#818cf8",tagBg:"rgba(99,102,241,.12)",tagBorder:"rgba(99,102,241,.28)",about:"An autonomous AI study partner that connects to your student account, responds to your voice, and uses Gemini 2.5 to generate study plans, quizzes, and progress tracking. Authenticated via Auth0, built at EmberHacks.",tech:"React, Flask, Gemini 2.5, ElevenLabs, Auth0, Porcupine, Playwright",link:"https://github.com/alextgu/emberhacks",devpost:"https://devpost.com/software/zed-7z0wg4"},
-    {title:"DFS – Depth First Social",tag:"Full-Stack",year:"2026",winner:true,accent:"#fbbf24",tagBg:"rgba(217,119,6,.12)",tagBorder:"rgba(217,119,6,.28)",about:"Matches people who think alike using your Gemini conversation history. Builds a 6-axis interest profile and uses Snowflake vector similarity to find compatible matches. Ephemeral chats expire after 10 minutes, built at DeerHacks.",tech:"Next.js, React, FastAPI, Snowflake, Supabase, Auth0, Solana",link:"https://github.com/alextgu/deerhacks",devpost:"https://devpost.com/software/deer-deer-deer"},
-    {title:"Sign Language Interpreter",tag:"Computer Vision",year:"2024",accent:"#60a5fa",tagBg:"rgba(37,99,235,.12)",tagBorder:"rgba(37,99,235,.28)",about:"Real-time sign language detection using MediaPipe hand landmarks and a KNN classifier. Captures video input, extracts keypoints, and translates gestures into readable text output.",tech:"Python, OpenCV, MediaPipe, KNN",link:"https://github.com/sakets-dev/sign_language_detector"},
-    {title:"Vision-Controlled Mouse",tag:"CV / ML",year:"2024",accent:"#34d399",tagBg:"rgba(5,150,105,.12)",tagBorder:"rgba(5,150,105,.28)",about:"Control your mouse cursor entirely through hand gestures using MediaPipe landmark detection and PyAutoGUI. No hardware required.",tech:"Python, OpenCV, MediaPipe, PyAutoGUI, NumPy",link:"https://github.com/sakets-dev/vision_controlled_mouse"},
-    {title:"Textify — PDF & Image to Text",tag:"Full-Stack",year:"2024",accent:"#fb7185",tagBg:"rgba(225,29,72,.12)",tagBorder:"rgba(225,29,72,.28)",about:"Full-stack OCR web app that converts PDFs and images into editable text using Tesseract and PDFPlumber.",tech:"Python, Flask, PDFPlumber, pytesseract, HTML, CSS, JavaScript",link:"https://github.com/sakets-dev/textify"},
-  ];
-
-  const stack=["React","Next.js","Python","TypeScript","AWS","Snowflake","Databricks","PostgreSQL","Docker","Flask","OpenCV","Git"];
-  const ghIcon=<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>;
-  const liIcon=<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>;
-  const emIcon=<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>;
-
-  return(
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html{scroll-behavior:smooth;}
-        body{background:#0f0f16;color:#ddd8d0;font-family:'DM Sans',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
-        @keyframes tip{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-        @keyframes pulseGreen{0%,100%{box-shadow:0 0 5px #4ade80}50%{box-shadow:0 0 14px #4ade80,0 0 24px rgba(74,222,128,.25)}}
-        .dot-pulse{animation:pulseGreen 2.8s ease-in-out infinite;}
-        .pill{display:inline-flex;align-items:center;padding:5px 13px;border-radius:999px;font-size:11.5px;font-weight:400;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.5);transition:background .2s,color .2s,transform .2s,border-color .2s;}
-        .pill:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85);transform:translateY(-2px);border-color:rgba(255,255,255,.15);}
-        .sl{font-size:10px;letter-spacing:.15em;color:rgba(255,255,255,.2);font-weight:500;text-transform:uppercase;}
-        ::-webkit-scrollbar{width:3px;}
-        ::-webkit-scrollbar-track{background:#0f0f16;}
-        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:999px;}
-      `}</style>
-
-      <CursorTrail/>
-      <GridBg/>
-      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:1,background:`radial-gradient(200px circle at ${pos.x}px ${pos.y}px,rgba(120,140,255,.08),transparent 100%)`}}/>
-
-      <div style={{position:"relative",zIndex:2}}>
-
-        {/* ── NAV ── */}
-        <Reveal delay={0}>
-          <nav style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 64px"}}>
-            <span style={{fontFamily:"'Instrument Serif',serif",fontSize:15,color:"rgba(255,255,255,.55)",letterSpacing:"-.01em"}}>saket.sharma</span>
-            <div style={{display:"flex",alignItems:"center",gap:2,padding:"5px 6px",borderRadius:999,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)"}}>
-              {[["About","#about"],["Work","#work"]].map(([label,href])=>(
-                <a key={label} href={href} style={{padding:"6px 18px",borderRadius:999,fontSize:12.5,color:"rgba(255,255,255,.42)",textDecoration:"none",letterSpacing:".02em",fontWeight:400,transition:"background .2s,color .2s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,.07)";e.currentTarget.style.color="rgba(255,255,255,.85)";}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="rgba(255,255,255,.42)";}}
-                >{label}</a>
+/* ─── PROJECT CARD ─── */
+function ProjectCard({ p, dark }) {
+  const [flipped, setFlipped] = useState(false);
+  const icons = { "AI / Voice": "AI", "Full-Stack": "FS", "Computer Vision": "CV", "CV / ML": "ML" };
+  const iconLabel = icons[p.tag] || "//";
+  const cardBg = dark ? "#111c14" : "#ffffff";
+  const cardBd = dark ? "rgba(80,160,80,.18)" : "#d8eed8";
+  const cardShadow = dark ? "0 8px 32px rgba(0,0,0,.4)" : "0 8px 32px rgba(60,140,60,.07)";
+  const titleCol = dark ? "#e8f5e8" : "#1e3e24";
+  const subCol = dark ? "#8ab090" : "#3a5a40";
+  const techCol = dark ? "#7ec87a" : "#3a6a40";
+  const backBg = dark ? "linear-gradient(135deg,#0e1a10,#162418)" : "linear-gradient(135deg,#2a4a30,#3a6a40)";
+  return (
+    <div style={{ perspective: 1000, cursor: "pointer", height: 260 }} onClick={() => setFlipped(f => !f)}>
+      <div style={{ position: "relative", width: "100%", height: "100%", transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", transition: "transform .55s cubic-bezier(.16,1,.3,1)" }}>
+        <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", background: cardBg, border: `1px solid ${cardBd}`, borderRadius: 14, boxShadow: cardShadow, padding: "22px 20px", display: "flex", flexDirection: "column" }}>
+          {p.winner && <div style={{ position: "absolute", top: 0, left: 20, right: 20, height: 2, background: "linear-gradient(90deg,#c9a96e,#e8c87a)", borderRadius: "0 0 2px 2px" }} />}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: dark ? "rgba(80,160,80,.14)" : "#eef8ee", border: `1px solid ${cardBd}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 500, color: techCol, letterSpacing: ".05em" }}>{iconLabel}</div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              {p.winner && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 7.5, letterSpacing: ".12em", color: "#c9a96e", background: dark ? "rgba(201,169,110,.1)" : "#fffbf0", border: "1px solid rgba(201,169,110,.28)", padding: "2px 8px" }}>WINNER</span>}
+              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 7.5, letterSpacing: ".1em", color: subCol, background: dark ? "rgba(80,160,80,.08)" : "#eef8ee", border: `1px solid ${cardBd}`, padding: "2px 8px" }}>{p.tag}</span>
+            </div>
+          </div>
+          <h3 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 600, color: titleCol, lineHeight: 1.3, marginBottom: 10, letterSpacing: "-.01em" }}>{p.title}</h3>
+          <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 12.5, lineHeight: 1.75, color: subCol, fontWeight: 300, flex: 1, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{p.about}</p>
+          <div style={{ marginTop: 10, fontFamily: "'DM Mono',monospace", fontSize: 8, color: dark ? "rgba(126,200,122,.35)" : "#80a880", letterSpacing: ".1em" }}>TAP TO SEE MORE</div>
+        </div>
+        <div style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", background: backBg, borderRadius: 14, boxShadow: cardShadow, padding: "22px 20px", transform: "rotateY(180deg)", display: "flex", flexDirection: "column" }}>
+          <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 600, color: "#c8f0c8", marginBottom: 8 }}>{p.title}</div>
+          <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 11.5, lineHeight: 1.75, color: "rgba(220,255,220,.75)", fontWeight: 300, flex: 1, overflow: "hidden" }}>{p.about}</p>
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
+              {p.tech.split(",").slice(0, 5).map((t, i) => (
+                <span key={i} style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: "rgba(200,240,200,.8)", background: "rgba(255,255,255,.08)", border: "1px solid rgba(200,240,200,.15)", padding: "3px 8px", borderRadius: 3 }}>{t.trim()}</span>
               ))}
             </div>
-            <a href="mailto:saketshar04@gmail.com" style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",borderRadius:999,background:"rgba(74,222,128,.06)",border:"1px solid rgba(74,222,128,.15)",textDecoration:"none",transition:"border-color .2s"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(74,222,128,.4)"}
-              onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(74,222,128,.15)"}
-            >
-              <div className="dot-pulse" style={{width:5,height:5,borderRadius:"50%",background:"#4ade80"}}/>
-              <span style={{fontSize:11,color:"#4ade80",fontWeight:500,letterSpacing:".04em"}}>Available</span>
-            </a>
-          </nav>
-        </Reveal>
-
-        {/* ── HERO ── */}
-        <div style={{display:"flex",alignItems:"center",minHeight:"92vh",padding:"0 52px",gap:0}}>
-          <div style={{flex:"0 0 50%",paddingLeft:72,paddingRight:48,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start"}}>
-
-            <Reveal delay={80}>
-              <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-                {["CS + Statistics","University of Toronto","Class of 2026"].map((t,i)=>(
-                  <span key={i} style={{padding:"4px 13px",borderRadius:999,fontSize:11,fontWeight:500,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",color:"rgba(255,255,255,.4)",letterSpacing:".03em"}}>{t}</span>
-                ))}
-              </div>
-            </Reveal>
-
-            <Reveal delay={160} tag="h1" style={{fontFamily:"'Instrument Serif',serif",fontSize:"clamp(72px,7.5vw,120px)",fontWeight:400,lineHeight:.92,letterSpacing:"-.04em",color:"#ede9e2",marginBottom:0}}>
-              Saket<br/>
-              <em style={{color:"rgba(237,233,226,.28)",fontStyle:"italic"}}>Sharma.</em>
-            </Reveal>
-
-            <Reveal delay={230} style={{marginTop:14}}>
-              <div style={{width:200,height:2,background:"linear-gradient(90deg,#6366f1,#8b5cf6,transparent)",borderRadius:999}}/>
-            </Reveal>
-
-            <Reveal delay={290} style={{marginTop:20}}>
-              <p style={{fontSize:16.5,fontWeight:300,lineHeight:1.85,color:"rgba(255,255,255,.48)",maxWidth:440}}>
-                20 y/o who loves to code. Always exploring new frameworks,{" "}
-                pushing limits, and shipping things that actually work.
-              </p>
-            </Reveal>
-
-            <Reveal delay={370} style={{marginTop:26,display:"flex",gap:10,flexWrap:"wrap"}}>
-              <TLink href="https://github.com/sakets-dev" icon={ghIcon} label="GitHub" tooltip="sakets-dev" color="#e2e8f0"/>
-              <TLink href="https://www.linkedin.com/in/saket-sharma-3a37871a7/" icon={liIcon} label="LinkedIn" tooltip="Saket Sharma" color="#60a5fa"/>
-              <TLink href="mailto:saketshar04@gmail.com" icon={emIcon} label="Email" tooltip="saketshar04@gmail.com" color="#f59e0b"/>
-            </Reveal>
+            <div style={{ display: "flex", gap: 8 }}>
+              <a href={p.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".1em", color: "#c8f0c8", background: "rgba(255,255,255,.1)", border: "1px solid rgba(200,240,200,.2)", padding: "7px 14px", borderRadius: 6, textDecoration: "none", transition: "background .2s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.18)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.1)"}>GITHUB</a>
+              {p.devpost && (
+                <a href={p.devpost} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                  style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".1em", color: "#c9a96e", background: "rgba(201,169,110,.12)", border: "1px solid rgba(201,169,110,.28)", padding: "7px 14px", borderRadius: 6, textDecoration: "none", transition: "background .2s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(201,169,110,.22)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(201,169,110,.12)"}>DEVPOST</a>
+              )}
+            </div>
           </div>
-
-          <Reveal delay={200} style={{flex:"0 0 50%",display:"flex",alignItems:"center",justifyContent:"center",userSelect:"none",paddingRight:24}}>
-            <ParticleGlobe size={580}/>
-          </Reveal>
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* ── ABOUT ── */}
-        <div id="about" style={{padding:"60px 64px 72px"}}>
-          <Reveal style={{display:"flex",alignItems:"center",gap:18,marginBottom:44}}>
-            <span className="sl">About</span>
-            <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(255,255,255,.07),transparent)"}}/>
-          </Reveal>
+/* ─── EXPERIENCE TIMELINE ─── */
+function ExperienceTimeline({ dark }) {
+  const [active, setActive] = useState(null);
+  const experiences = [
+    { role: "Incomfing Software Development Engineer Intern", company: "Amazon", period: "Jun 2026 – Sep 2026", location: "Vancouver / Remote", color: "#ff9900", points: ["Contributing to development and optimization of internal AI tools and scalable cloud infrastructure using AWS services.", "Collaborating with engineering teams to implement efficient backend solutions and enhance data processing pipelines."] },
+    { role: "Software Engineer", company: "COBWEB", period: "Sep 2023 – May 2025", location: "Waterloo, Ontario", color: "#7ec87a", points: ["Migrated core codebase from Java to Python, increasing AI/ML model flexibility and supporting implementation of sophisticated agent behaviors and collaborative development protocols.", "Established CI/CD pipelines to enhance model scalability and reliability through testing and agile deployment strategies."] },
+    { role: "Camp Counsellor", company: "Heartland Church", period: "Jun 2022 – Aug 2022", location: "Mississauga, Ontario", color: "#60a5fa", points: ["Led a team of 3 counselors to design and implement age-appropriate activities fostering personal growth, skill development, and team building for 100+ campers — resulting in a 15% increase in positive feedback.", "Pioneered a new 'Leadership Academy' program consisting of 10 age-appropriate activities teaching math, science, and leadership skills to 60 campers."] },
+  ];
+  const titleCol = dark ? "#e8f5e8" : "#1a3020";
+  const subCol = dark ? "#8ab090" : "#3a5a40";
+  const lineBg = dark ? "rgba(80,160,80,.2)" : "#c8e0c8";
+  const cardBg = dark ? "#0f1a11" : "#ffffff";
+  const cardBd = dark ? "rgba(80,160,80,.2)" : "#d8eed8";
+  return (
+    <div style={{ position: "relative" }}>
+      <div style={{ position: "absolute", left: 18, top: 12, bottom: 12, width: 1.5, background: lineBg }} />
+      {experiences.map((exp, i) => {
+        const isOpen = active === i;
+        return (
+          <div key={i} style={{ position: "relative", paddingLeft: 52 }}>
+            <div onClick={() => setActive(isOpen ? null : i)} style={{ position: "absolute", left: 10, top: 22, width: 18, height: 18, borderRadius: "50%", background: isOpen ? exp.color : (dark ? "#0b1410" : "#f4fbf4"), border: `2px solid ${isOpen ? exp.color : lineBg}`, cursor: "pointer", transition: "all .25s", transform: isOpen ? "scale(1.25)" : "scale(1)", zIndex: 2, boxShadow: isOpen ? `0 0 0 4px ${exp.color}28` : "none" }} />
+            <div onClick={() => setActive(isOpen ? null : i)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0", cursor: "pointer", borderBottom: `1px solid ${isOpen ? "transparent" : lineBg}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 600, color: titleCol, letterSpacing: "-.02em" }}>{exp.role}</span>
+                <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 500, color: exp.color, opacity: .9 }}>{exp.company}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0, marginLeft: 20 }}>
+                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, letterSpacing: ".1em", color: dark ? "#6a8a70" : "#5a7a60" }}>{exp.period}</span>
+                <span style={{ fontSize: 18, color: dark ? "#5a8060" : "#6a9070", transition: "transform .3s", display: "inline-block", transform: isOpen ? "rotate(45deg)" : "rotate(0deg)", lineHeight: 1 }}>+</span>
+              </div>
+            </div>
+            <div style={{ overflow: "hidden", maxHeight: isOpen ? 320 : 0, opacity: isOpen ? 1 : 0, transition: "max-height .45s cubic-bezier(.16,1,.3,1), opacity .3s ease" }}>
+              <div style={{ background: cardBg, border: `1px solid ${cardBd}`, borderLeft: `3px solid ${exp.color}`, borderRadius: 10, padding: "18px 20px", marginBottom: 10 }}>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9.5, letterSpacing: ".1em", color: dark ? "#567060" : "#7a9a80", marginBottom: 14, textTransform: "uppercase" }}>{exp.location}</div>
+                <ul style={{ paddingLeft: 0, margin: 0, listStyle: "none" }}>
+                  {exp.points.map((pt, pi) => (
+                    <li key={pi} style={{ display: "flex", gap: 10, fontFamily: "'Outfit',sans-serif", fontSize: 14, lineHeight: 1.78, color: subCol, fontWeight: 300, marginBottom: pi < exp.points.length - 1 ? 12 : 0 }}>
+                      <span style={{ color: exp.color, flexShrink: 0, marginTop: 4, fontSize: 10 }}>▸</span>{pt}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-          <Reveal delay={60}>
-            <p style={{fontFamily:"'Instrument Serif',serif",fontSize:"clamp(26px,3vw,42px)",lineHeight:1.28,color:"rgba(237,233,226,.9)",fontWeight:400,letterSpacing:"-.025em",maxWidth:800,marginBottom:48}}>
-              I build with the belief that great software should feel as good as it works.
-            </p>
-          </Reveal>
+/* ─── SECTION LABEL — no hints, no "extra" ─── */
+function SectionLabel({ num, label, dark }) {
+  const col = dark ? "rgba(80,160,80,.18)" : "#c8e0c8";
+  const textCol = dark ? "rgba(160,220,160,.75)" : "#4a7a50";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 52 }}>
+      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".22em", color: textCol, textTransform: "uppercase", whiteSpace: "nowrap" }}>{num} / {label}</span>
+      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${col},transparent)` }} />
+    </div>
+  );
+}
 
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:20,marginBottom:48}}>
-            {[
-              {label:"Background",accent:"#818cf8",text:<>CS & Statistics at UofT. I love the intersection of math and product — always chasing that mix of elegant logic and real-world impact.</>},
-              {label:"Experience",accent:"#34d399",text:<>Attended <strong style={{color:"rgba(255,255,255,.85)",fontWeight:500}}>YC Startup School</strong> and <strong style={{color:"rgba(255,255,255,.85)",fontWeight:500}}>QSYS</strong>. Multiple hackathon wins, building and shipping under pressure.</>},
-              {label:"Right Now",accent:"#f59e0b",text:<>Working toward a startup. Exploring ideas, picking up new tools fast, and looking for the right problem to go all-in on.</>},
-            ].map(({label,accent,text},i)=>(
-              <Reveal key={label} delay={80+i*70} from={i===0?"left":i===2?"right":"bottom"}>
-                <div style={{padding:"22px 24px",borderRadius:12,background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.06)"}}>
-                  <div style={{width:24,height:2,background:accent,borderRadius:999,marginBottom:14}}/>
-                  <p style={{fontSize:10,letterSpacing:".13em",color:"rgba(255,255,255,.28)",fontWeight:600,textTransform:"uppercase",marginBottom:10}}>{label}</p>
-                  <p style={{fontSize:13.5,lineHeight:1.85,color:"rgba(255,255,255,.62)",fontWeight:300}}>{text}</p>
-                </div>
-              </Reveal>
+/* ─── MAIN APP ─── */
+export default function App() {
+  const [dark, setDark] = useState(true);
+  const bg = dark ? "#0b1410" : "#f4fbf4";
+  const fg = dark ? "#d8f0d8" : "#1a3020";
+  const sub = dark ? "#7a9a80" : "#4a6a50";
+  const border = dark ? "rgba(80,160,80,.15)" : "#d0e8d0";
+  const navBg = dark ? "rgba(11,20,16,.92)" : "rgba(244,251,244,.94)";
+  const accent = dark ? "#7ec87a" : "#3a7a40";
+
+  const works = [
+    { title: "Zed.AI — Your AI Study Buddy", tag: "AI / Voice", winner: true, about: "An autonomous AI study partner that connects to your student account, responds to your voice, and uses Gemini 2.5 to generate study plans, quizzes, and progress tracking. Authenticated via Auth0, built at EmberHacks.", tech: "React, Flask, Gemini 2.5, ElevenLabs, Auth0, Porcupine, Playwright", link: "https://github.com/alextgu/emberhacks", devpost: "https://devpost.com/software/zed-7z0wg4" },
+    { title: "DFS — Depth First Social", tag: "Full-Stack", winner: true, about: "Matches people who think alike using your Gemini conversation history. Builds a 6-axis interest profile and uses Snowflake vector similarity to find compatible matches. Ephemeral chats expire after 10 minutes, built at DeerHacks.", tech: "Next.js, React, FastAPI, Snowflake, Supabase, Auth0, Solana", link: "https://github.com/alextgu/deerhacks", devpost: "https://devpost.com/software/deer-deer-deer" },
+    { title: "Sign Language Interpreter", tag: "Computer Vision", about: "Real-time sign language detection using MediaPipe hand landmarks and a KNN classifier. Captures video input, extracts keypoints, and translates gestures into readable text.", tech: "Python, OpenCV, MediaPipe, KNN", link: "https://github.com/sakets-dev/sign_language_detector" },
+    { title: "Vision-Controlled Mouse", tag: "CV / ML", about: "Control your mouse cursor entirely through hand gestures using MediaPipe landmark detection and PyAutoGUI. No hardware required.", tech: "Python, OpenCV, MediaPipe, PyAutoGUI, NumPy", link: "https://github.com/sakets-dev/vision_controlled_mouse" },
+    { title: "Textify — PDF & Image to Text", tag: "Full-Stack", about: "Full-stack OCR web app that converts PDFs and images into editable text using Tesseract and PDFPlumber.", tech: "Python, Flask, PDFPlumber, pytesseract, HTML, CSS, JavaScript", link: "https://github.com/sakets-dev/textify" },
+  ];
+
+  const stack = ["React", "Next.js", "Python", "TypeScript", "AWS", "Snowflake", "Databricks", "PostgreSQL", "Docker", "Flask", "OpenCV", "Git"];
+  const GH = <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" /></svg>;
+  const LI = <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>;
+  const EM = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>;
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap');
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html{scroll-behavior:smooth;}
+        body{overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+        ::selection{background:#4a9a50;color:#fff;}
+        ::-webkit-scrollbar{width:3px;}
+        ::-webkit-scrollbar-thumb{background:rgba(80,160,80,.25);border-radius:99px;}
+        a{text-decoration:none;color:inherit;}
+      `}</style>
+      <div style={{ background: bg, color: fg, minHeight: "100vh", transition: "background .5s, color .4s" }}>
+
+        {/* NAV */}
+        <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 52px", height: 58, background: navBg, borderBottom: `1px solid ${border}`, backdropFilter: "blur(16px)", transition: "background .5s, border-color .4s" }}>
+          <Logo dark={dark} />
+          <div style={{ display: "flex", gap: 2 }}>
+            {[["About", "#about"], ["Experience", "#experience"], ["Work", "#work"]].map(([l, h]) => (
+              <a key={l} href={h} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13, fontWeight: 400, color: sub, padding: "6px 14px", borderRadius: 6, transition: "color .2s, background .2s" }}
+                onMouseEnter={e => { e.currentTarget.style.color = accent; e.currentTarget.style.background = dark ? "rgba(80,160,80,.1)" : "#e8f8e8"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = sub; e.currentTarget.style.background = "transparent"; }}>{l}</a>
             ))}
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <SocialLink href="https://github.com/sakets-dev" icon={GH} dark={dark} />
+            <SocialLink href="https://www.linkedin.com/in/saket-sharma-3a37871a7/" icon={LI} dark={dark} />
+            <SocialLink href="mailto:saketshar04@gmail.com" icon={EM} dark={dark} />
+          </div>
+        </nav>
 
-          <Reveal delay={200}>
-            <p className="sl" style={{marginBottom:14}}>Stack</p>
-            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-              {stack.map(s=><span key={s} className="pill">{s}</span>)}
+        {/* HERO */}
+        <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "56px 52px 0", maxWidth: 1200, margin: "0 auto" }}>
+          <div style={{ flex: 1, paddingRight: 56 }}>
+            <p style={{ fontFamily: "'DM Mono',monospace", fontSize: 15, letterSpacing: ".2em", color: accent, textTransform: "uppercase", marginBottom: 18, fontWeight: 400 }}>Hello, I'm</p>
+            <h1 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: "clamp(68px,9vw,114px)", lineHeight: .91, color: dark ? "#eaf5ea" : "#1a3020", letterSpacing: "-.04em", marginBottom: 26 }}>
+              Saket<span style={{ color: accent }}>.</span>
+            </h1>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: dark ? "rgba(255,153,0,.08)" : "rgba(255,153,0,.08)", border: `1px solid ${dark ? "rgba(255,153,0,.25)" : "rgba(255,153,0,.38)"}`, borderRadius: 6, padding: "8px 16px", marginBottom: 28 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff9900" }} />
+              <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 13.5, fontWeight: 500, color: dark ? "#ffba50" : "#a06010" }}>Incoming SDE @ Amazon, 2026</span>
+            </div>
+            <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 16, fontWeight: 300, lineHeight: 1.8, color: dark ? "#9abaa0" : "#2a4a30", maxWidth: 420, marginBottom: 32, transition: "color .4s" }}>
+              CS & Statistics at the University of Toronto. I build software that's elegant, fast, and actually ships.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 36 }}>
+              {["CS + Statistics", "University of Toronto"].map(t => (
+                <span key={t} style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".1em", color: dark ? "#6a9a70" : "#4a7a50", background: dark ? "rgba(80,160,80,.1)" : "#e8f8e8", border: `1px solid ${border}`, padding: "5px 12px", borderRadius: 3 }}>{t}</span>
+              ))}
+            </div>
+            <a href="#work" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "'Outfit',sans-serif", fontSize: 14, fontWeight: 500, color: "#fff", background: dark ? "linear-gradient(135deg,#2a5a30,#3a7a40)" : "linear-gradient(135deg,#2a5a30,#4a9a50)", padding: "13px 30px", borderRadius: 10, boxShadow: dark ? "0 6px 20px rgba(40,120,50,.3)" : "0 6px 20px rgba(60,160,60,.25)", transition: "transform .2s, box-shadow .2s", letterSpacing: ".01em" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = dark ? "0 10px 28px rgba(40,120,50,.5)" : "0 10px 28px rgba(60,160,60,.38)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = dark ? "0 6px 20px rgba(40,120,50,.3)" : "0 6px 20px rgba(60,160,60,.25)"; }}>
+              View My Work
+            </a>
+          </div>
+          <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "center", height: 520, paddingBottom: 60, position: "relative" }}>
+            {!dark && <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translate(-50%,-50%)", width: 340, height: 340, borderRadius: "50%", background: "radial-gradient(ellipse,rgba(180,250,80,.14) 0%,transparent 70%)", pointerEvents: "none" }} />}
+            {dark && <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translate(-50%,-50%)", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(ellipse,rgba(80,160,80,.07) 0%,transparent 70%)", pointerEvents: "none" }} />}
+            <DeskLamp dark={dark} onToggle={() => setDark(d => !d)} />
+            <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", fontFamily: "'DM Mono',monospace", fontSize: 8, letterSpacing: ".16em", color: dark ? "rgba(126,200,122,.28)" : "rgba(60,120,60,.38)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+              {dark ? "pull to turn on" : "pull to turn off"}
+            </div>
+          </div>
+        </section>
+
+        <div style={{ height: 1, background: dark ? "rgba(80,160,80,.1)" : "#d8eed8", maxWidth: 1100, margin: "0 auto" }} />
+
+        {/* ABOUT */}
+        <section id="about" style={{ maxWidth: 1200, margin: "0 auto", padding: "88px 52px" }}>
+          <Reveal><SectionLabel num="02" label="About" dark={dark} /></Reveal>
+          <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: "0 64px", alignItems: "start" }}>
+            <Reveal delay={60}>
+              <h2 style={{ fontFamily: "'Outfit',sans-serif", fontSize: "clamp(24px,2.8vw,38px)", fontWeight: 600, lineHeight: 1.25, color: dark ? "#d8ecd8" : "#1a3020", letterSpacing: "-.02em", marginBottom: 20 }}>
+                CS & Statistics at UofT.<br />
+                <span style={{ fontWeight: 300, color: dark ? "#8aaa90" : "#4a6a50" }}>I love the intersection of math and product.</span>
+              </h2>
+              <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, lineHeight: 1.85, color: dark ? "#9abaa0" : "#2a4a30", fontWeight: 300, marginBottom: 16 }}>
+                I build with the belief that great software should feel as good as it works. Attended <strong style={{ color: accent, fontWeight: 500 }}>YC Startup School</strong> and <strong style={{ color: accent, fontWeight: 500 }}>QSYS</strong> — multiple hackathon wins, building and shipping under pressure.
+              </p>
+              <p style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, lineHeight: 1.85, color: dark ? "#6a8a70" : "#5a7a60", fontWeight: 300 }}>
+                Now heading into my first SDE role at Amazon. Always looking for the next interesting problem to solve.
+              </p>
+            </Reveal>
+            <Reveal delay={120}>
+              <div style={{ background: dark ? "rgba(80,160,80,.05)" : "#eef8ee", border: `1px solid ${border}`, borderRadius: 14, padding: "26px 22px" }}>
+                <p style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, letterSpacing: ".2em", color: dark ? "rgba(160,220,160,.55)" : "#5a8a60", textTransform: "uppercase", marginBottom: 16 }}>Stack</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  {stack.map(s => (
+                    <span key={s} style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: dark ? "#6a9a70" : "#4a7a50", background: dark ? "rgba(80,160,80,.1)" : "#fff", border: `1px solid ${dark ? "rgba(80,160,80,.2)" : "#c8e0c8"}`, padding: "5px 11px", borderRadius: 5, transition: "background .2s, color .2s, transform .2s", cursor: "default" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = dark ? "rgba(80,160,80,.22)" : "#d8f0d8"; e.currentTarget.style.color = dark ? "#b0e8b0" : "#2a5a30"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = dark ? "rgba(80,160,80,.1)" : "#fff"; e.currentTarget.style.color = dark ? "#6a9a70" : "#4a7a50"; e.currentTarget.style.transform = "none"; }}>
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <div style={{ height: 1, background: dark ? "rgba(80,160,80,.1)" : "#d8eed8", maxWidth: 1100, margin: "0 auto" }} />
+
+        {/* EXPERIENCE */}
+        <section id="experience" style={{ maxWidth: 1200, margin: "0 auto", padding: "88px 52px" }}>
+          <Reveal><SectionLabel num="03" label="Experience" dark={dark} /></Reveal>
+          <Reveal delay={60}><ExperienceTimeline dark={dark} /></Reveal>
+        </section>
+
+        <div style={{ height: 1, background: dark ? "rgba(80,160,80,.1)" : "#d8eed8", maxWidth: 1100, margin: "0 auto" }} />
+
+        {/* WORK */}
+        <section id="work" style={{ maxWidth: 1200, margin: "0 auto", padding: "88px 52px 120px" }}>
+          <Reveal><SectionLabel num="04" label="Selected Work" dark={dark} /></Reveal>
+          <Reveal delay={60}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+              {works.map((w) => <ProjectCard key={w.title} p={w} dark={dark} />)}
             </div>
           </Reveal>
-        </div>
-
-        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 20%,rgba(255,255,255,.06) 80%,transparent)",margin:"0 64px"}}/>
-
-        {/* ── WORK ── */}
-        <div id="work" style={{padding:"60px 64px 72px"}}>
-          <Reveal style={{display:"flex",alignItems:"center",gap:18,marginBottom:6}}>
-            <span className="sl">Selected Work</span>
-            <div style={{flex:1,height:1,background:"linear-gradient(90deg,rgba(255,255,255,.07),transparent)"}}/>
-            <span style={{fontSize:9.5,color:"rgba(255,255,255,.15)",letterSpacing:".08em"}}>CLICK TO EXPAND</span>
-          </Reveal>
-          <Reveal delay={60}>
-            <p style={{fontSize:13,color:"rgba(255,255,255,.25)",fontWeight:300,marginBottom:24,marginTop:8,letterSpacing:".01em"}}>
-              Hackathon winners, CV tools, and full-stack products — built fast, shipped real.
-            </p>
-          </Reveal>
-          {works.map((w,i)=><ProjectRow key={w.title} p={w} delay={80+i*50}/>)}
-        </div>
-
-        <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(255,255,255,.06) 20%,rgba(255,255,255,.06) 80%,transparent)",margin:"0 64px"}}/>
-
-        {/* ── FOOTER ── */}
-        <div style={{padding:"20px 64px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontFamily:"'Instrument Serif',serif",fontSize:14,color:"rgba(255,255,255,.18)"}}>saket.sharma</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,.12)",letterSpacing:".04em"}}>© 2026</span>
-          <span style={{fontSize:11,color:"rgba(255,255,255,.12)"}}>Toronto, CA</span>
-        </div>
+        </section>
 
       </div>
     </>

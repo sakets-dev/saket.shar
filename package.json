@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -31,10 +30,5 @@
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "vite": "^7.3.1"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "deploy": "gh-pages -d dist"
   }
 }
